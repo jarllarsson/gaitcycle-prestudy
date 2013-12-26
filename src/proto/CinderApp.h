@@ -1,5 +1,4 @@
-
-//#include "CinderApp.h"
+#pragma once
 
 #include "cinder/app/AppBasic.h"
 #include <list>
@@ -41,16 +40,3 @@ void CinderApp::draw()
 	}
 	gl::end();
 }
-
-
-// This line tells Cinder to actually create the application
-CINDER_APP_BASIC( CinderApp, RendererGl )
-/*
-int main()
-{
-	
-
-	cout<<"Hello World!";
-	return 0;
-}
-*/
