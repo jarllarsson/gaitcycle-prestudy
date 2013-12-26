@@ -1,13 +1,17 @@
-# Compiled Object files
-*.slo
-*.lo
-*.o
+# Binaries
+*.exe
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
+# VS files
+*.sdf
+*.ilk
+*.pdb
+*.vcxproj.filters
+*.vcxproj.user
+*.opensdf
+*.suo
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
+# Directories
+/obj
+/ext
+
+
