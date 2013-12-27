@@ -17,12 +17,13 @@ class CinderApp : public AppBasic {
   public:
 	void mouseDrag( MouseEvent event );
 	void keyDown( KeyEvent event );
+	void prepareSettings( Settings *settings );
 	void setup();
 	void update();
 	void draw();
 
 	// This will maintain a list of points which we will draw line segments between
-	list<Vec2f>		mPoints;
+	list<Vec3f>		mPoints;
 	gl::Texture		myImage;
 	// camera
 	CameraPersp		mCam;
@@ -30,14 +31,19 @@ class CinderApp : public AppBasic {
 	Vec3f			mCamPos;
 	Vec3f			mCamUp;
 	Quatf			mCamRot;
+	float			mCamDist;
 
 	// Input
-	params::InterfaceGl mDebugInterface;
+	params::InterfaceGlRef mDebugInterface;
 };
 
 void CinderApp::mouseDrag( MouseEvent event )
 {
-	mPoints.push_back( event.getPos() );
+	Vec2f epos = event.getPos();
+	Vec3f wpos = Vec3f(((epos.x/getWindowWidth())*2.0f - 1.0f)*mCamDist,-((epos.y/getWindowHeight())*2.0f - 1.0f)*mCamDist,-1.0f);
+	Matrix44f wmat = mCamRot.toMatrix44();
+	wpos = wmat.transformPoint(wpos);
+	mPoints.push_back(wpos);
 }
 
 void CinderApp::keyDown( KeyEvent event )
@@ -46,37 +52,57 @@ void CinderApp::keyDown( KeyEvent event )
 		setFullScreen( ! isFullScreen() );
 }
 
+void CinderApp::prepareSettings( Settings *settings )
+{
+	settings->setWindowSize( 1280, 720 );
+	settings->setFrameRate( 60.0f );
+}
+
 void CinderApp::setup()
 {
-	mCamPos = Vec3f( 0.0f, 0.0f, 500.0f );
+	// camera
+	mCamDist = 500.0f;
+	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
 	mCamLookat = Vec3f::zero();
 	mCamUp = Vec3f::yAxis();
+	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 5.0f, 3000.0f );
+
+	// funny
 	myImage = gl::Texture( loadImage( loadAsset( "img.jpg" ) ) );
 
 	// Debug interface
-	mDebugInterface = params::InterfaceGl( "Gait", Vec2i( 225, 200 ) );
-	mDebugInterface.addParam( "Camera angle", &mDebugInterface );
+	mDebugInterface = params::InterfaceGl::create( "Gait", Vec2i( 225, 200 ) );
+	mDebugInterface->addParam( "Cam angle", &mCamRot);
+	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=50.0 max=1000.0 step=50.0 keyIncr=s keyDecr=w" );
 }
 
 void CinderApp::update()
 {
 	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 5.0f, 3000.0f );
+	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
 	mCam.lookAt( mCamPos, mCamLookat, mCamUp );
 	gl::setMatrices( mCam );
+	gl::rotate( mCamRot );
 }
 
 void CinderApp::draw()
 {
-	gl::clear( Color( 0.1f, 0.1f, 0.15f ) );
+	gl::clear( Color( 0.1f, 0.1f, 0.15f ), true );
+	gl::enableDepthRead();
+	gl::enableDepthWrite();
 
+	gl::color( 1.0f, 1.0f, 1.0f );	
 	gl::draw( myImage, getWindowBounds() );
-
 	gl::color( 1.0f, 0.5f, 0.25f );	
 	gl::begin( GL_LINE_STRIP );
 	for( auto pointIter = mPoints.begin(); pointIter != mPoints.end(); ++pointIter ) {
 		gl::vertex( *pointIter );
 	}
+
 	gl::end();
+	glColor4f( ColorA( 0.0f, 1.0f, 1.0f, 0.1f ) );
+	// gl::drawSphere( mCamLookat, 10.0f, 16 );
+	mDebugInterface->draw();
 }
 
 
