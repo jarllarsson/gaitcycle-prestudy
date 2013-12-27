@@ -1,24 +1,31 @@
 #pragma once
-#include <cinder\Vector.h>
-using namespace ci;
+
 // =======================================================================================
-//                                      Foot
+//                                      GaitCycle
 // =======================================================================================
 
 ///---------------------------------------------------------------------------------------
-/// \brief	A foot
+/// \brief	Gait cycle data for a collection of feet
 ///        
-/// # Foot
+/// # GaitCycle
 /// Detailed description.....
 /// Created on: 27-12-2013 
 ///---------------------------------------------------------------------------------------
 
-class Foot
+struct GaitCycle
 {
 public:
-	Foot();
-	virtual ~Foot();
-protected:
-private:
-	Vec3f mPos;
+	/// 
+	/// Number of feet (divisible by 2).
+	///
+	int			mFeetCount;
+	/// 
+	/// Collection of normalized step cycles, one for
+	/// the movement of each foot.
+	///
+	StepCycle[] mStepCycles;
+	///
+	/// The time it takes to complete the gait cycle
+	///
+	float		mGaitPeriod;
 };

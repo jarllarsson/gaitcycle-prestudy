@@ -1,24 +1,29 @@
 #pragma once
-#include <cinder\Vector.h>
-using namespace ci;
+
+#include "GaitCycle.h"
+
 // =======================================================================================
-//                                      Foot
+//                                      AnimationPlayer
 // =======================================================================================
 
 ///---------------------------------------------------------------------------------------
-/// \brief	A foot
+/// \brief	Handler for playing gait data
 ///        
-/// # Foot
+/// # AnimationPlayer
 /// Detailed description.....
 /// Created on: 27-12-2013 
 ///---------------------------------------------------------------------------------------
 
-class Foot
+class AnimationPlayer
 {
 public:
-	Foot();
-	virtual ~Foot();
+	AnimationPlayer();
+	virtual ~AnimationPlayer();
 protected:
 private:
-	Vec3f mPos;
+	GaitCycle mGaitCycle;
+	///
+	/// The current phase 0..1
+	///
+	float		mGaitPhase;
 };
