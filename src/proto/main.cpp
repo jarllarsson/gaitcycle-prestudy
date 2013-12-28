@@ -1,12 +1,17 @@
 
 //#include "CinderApp.h"
 
+#include "AnimationPlayer.h"
+
 #include "cinder/app/AppBasic.h"
 #include "cinder/ImageIo.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/Camera.h"
 #include "cinder/params/Params.h"
 #include <list>
+#include <string>
+#include "ToString.h"
+#include <cinder/gl/TextureFont.h>
 
 using namespace ci;
 using namespace ci::app;
@@ -32,6 +37,12 @@ class CinderApp : public AppBasic {
 	Vec3f			mCamUp;
 	Quatf			mCamRot;
 	float			mCamDist;
+	float mTextBaseLine;
+
+	gl::TextureFontRef	mFont;
+
+	//
+	AnimationPlayer mPlayer;
 
 	// Input
 	params::InterfaceGlRef mDebugInterface;
@@ -54,12 +65,16 @@ void CinderApp::keyDown( KeyEvent event )
 
 void CinderApp::prepareSettings( Settings *settings )
 {
-	settings->setWindowSize( 1280, 720 );
+	settings->setWindowSize( 800, 600 );
 	settings->setFrameRate( 60.0f );
 }
 
 void CinderApp::setup()
 {
+	mTextBaseLine=20.0f;
+	mPlayer.init();
+	mFont = gl::TextureFont::create( Font( "Arial", 30 ));
+
 	// camera
 	mCamDist = 500.0f;
 	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
@@ -73,26 +88,38 @@ void CinderApp::setup()
 	// Debug interface
 	mDebugInterface = params::InterfaceGl::create( "Gait", Vec2i( 225, 200 ) );
 	mDebugInterface->addParam( "Cam angle", &mCamRot);
+	mDebugInterface->addParam( "txt", &mTextBaseLine);
 	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=50.0 max=1000.0 step=50.0 keyIncr=s keyDecr=w" );
+	mDebugInterface->addParam( "Phase", mPlayer.getGaitPhaseRef() );
 }
 
 void CinderApp::update()
 {
+	mPlayer.update(1.0f/60.0f);
+
 	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 5.0f, 3000.0f );
 	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
 	mCam.lookAt( mCamPos, mCamLookat, mCamUp );
-	gl::setMatrices( mCam );
-	gl::rotate( mCamRot );
 }
 
 void CinderApp::draw()
-{
+{	
 	gl::clear( Color( 0.1f, 0.1f, 0.15f ), true );
+	gl::color( 1.0f, 1.0f, 1.0f );
+	gl::draw( myImage, getWindowBounds() );
+
+
+	gl::setMatrices( mCam );
+	gl::rotate( mCamRot );
+	//
+
 	gl::enableDepthRead();
 	gl::enableDepthWrite();
+	gl::enableAlphaBlending();
+
 
 	gl::color( 1.0f, 1.0f, 1.0f );	
-	gl::draw( myImage, getWindowBounds() );
+
 	gl::color( 1.0f, 0.5f, 0.25f );	
 	gl::begin( GL_LINE_STRIP );
 	for( auto pointIter = mPoints.begin(); pointIter != mPoints.end(); ++pointIter ) {
@@ -101,7 +128,14 @@ void CinderApp::draw()
 
 	gl::end();
 	glColor4f( ColorA( 0.0f, 1.0f, 1.0f, 0.1f ) );
-	// gl::drawSphere( mCamLookat, 10.0f, 16 );
+	gl::drawColorCube( mCamLookat, Vec3f(10.0f,10.0f,10.0f) );
+
+	glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
+	gl::disableDepthRead();
+	gl::disableDepthWrite();
+	gl::setMatricesWindow(getWindowWidth(),getWindowHeight());
+	mFont->drawString(toString(*mPlayer.getGaitPhaseRef()),
+		Vec2f(2.0f,mTextBaseLine));
 	mDebugInterface->draw();
 }
 

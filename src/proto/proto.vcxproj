@@ -91,6 +91,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AnimationPlayer.cpp" />
     <ClCompile Include="Foot.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
@@ -99,6 +100,7 @@
     <ClInclude Include="Foot.h" />
     <ClInclude Include="GaitCycle.h" />
     <ClInclude Include="StepCycle.h" />
+    <ClInclude Include="ToString.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

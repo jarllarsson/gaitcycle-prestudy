@@ -1,5 +1,7 @@
 #pragma once
 
+#include "StepCycle.h"
+
 // =======================================================================================
 //                                      GaitCycle
 // =======================================================================================
@@ -15,6 +17,7 @@
 struct GaitCycle
 {
 public:
+	virtual ~GaitCycle() {delete [] mStepCycles;}
 	/// 
 	/// Number of feet (divisible by 2).
 	///
@@ -23,7 +26,7 @@ public:
 	/// Collection of normalized step cycles, one for
 	/// the movement of each foot.
 	///
-	StepCycle[] mStepCycles;
+	StepCycle* mStepCycles;
 	///
 	/// The time it takes to complete the gait cycle
 	///

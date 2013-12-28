@@ -19,11 +19,16 @@ class AnimationPlayer
 public:
 	AnimationPlayer();
 	virtual ~AnimationPlayer();
+
+	void init();
+	void update(float p_dt);
+	GaitCycle* getGaitDataRef() const;
+	float* getGaitPhaseRef();
 protected:
 private:
-	GaitCycle mGaitCycle;
-	///
-	/// The current phase 0..1
-	///
-	float		mGaitPhase;
+	GaitCycle*	mGaitCycle;
+
+	float		mGaitPhase; ///< The current phase 0..1
+	float		mStrideLength;
+	float		mSwingHeight;
 };
