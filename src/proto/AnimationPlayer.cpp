@@ -17,7 +17,7 @@ void AnimationPlayer::init()
 {
 	if (mGaitCycle)
 	{
-		int n=4;
+		int n=20;
 		mGaitCycle->mFeetCount = n;
 		mGaitCycle->mGaitPeriod = 1.0f;
 		mGaitCycle->mStepCycles = new StepCycle[n];
@@ -29,7 +29,7 @@ void AnimationPlayer::init()
 			stepCycle->mNormStepTrigger = ((float)i/(float)n);
 			// safety clamp
 			while (stepCycle->mNormStepTrigger+stepCycle->mNormDutyFactor > 1.0f)
-				stepCycle->mNormStepTrigger -= stepCycle->mNormDutyFactor;
+				stepCycle->mNormStepTrigger += 1.0f-(stepCycle->mNormStepTrigger+stepCycle->mNormDutyFactor);
 		}
 
 	}

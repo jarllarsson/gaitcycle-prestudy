@@ -79,7 +79,7 @@ void CinderApp::setup()
 	mPlayer.init();
 	mFont = new gl::TextureFontRef[mMaxFontSize+1];
 	for (int i=0;i<=mMaxFontSize;i++)
-		mFont[i] = gl::TextureFont::create( Font( "Arial", i+5 ));
+		mFont[i] = gl::TextureFont::create( Font( "Arial", (float)i+5.0f ));
 
 	// camera
 	mCamDist = 500.0f;
@@ -93,7 +93,7 @@ void CinderApp::setup()
 
 	// Debug interface
 	mDebugInterface = params::InterfaceGl::create( "Gait", Vec2i( 225, 200 ) );
-	mDebugInterface->setOptions("GLOBAL","Gait position='10 300'");
+	mDebugInterface->setOptions("","Gait position='10 300'");
 	mDebugInterface->addParam( "Cam angle", &mCamRot, "visible=true");
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
 	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=50.0 max=1000.0 step=50.0 keyIncr=s keyDecr=w" );
@@ -151,19 +151,21 @@ void CinderApp::draw()
 void CinderApp::visualizeGaitCycles(float& p_baseLine)
 {
 	GaitCycle* cycles = mPlayer.getGaitDataRef();
-	// Draw body visualization
+
+	float currentT=*mPlayer.getGaitPhaseRef();
 	float timelineLen=100.0f;
 	float timelineFeetOffset=10.0f;
 	float xpad=30.0f+timelineLen+timelineFeetOffset;
 	float feetW=10.0f;
 	float feetH=10.0f;
 	float feetMargin=10.0f;
-	p_baseLine+=feetMargin;
 	float bodyW=50.0f;
-	float bodyH=(float)(cycles->mFeetCount)*(feetH+feetMargin);
+	float bodyH=(float)(cycles->mFeetCount-1)*(feetH+feetMargin)+feetMargin;
+	// Draw body visualization		
 	gl::drawStrokedRect(Rectf(xpad,p_baseLine,xpad+bodyW,p_baseLine+bodyH));
-	
-	int fsize=10;
+	p_baseLine+=feetMargin;
+
+	int fsize=5;
 
 	// Draw feet visualization
 	for (int i=0;i<cycles->mFeetCount;i+=2)
@@ -171,15 +173,26 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 		glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
 		float y1=p_baseLine+(feetMargin+feetH)*i;
 		float y2=y1+feetH;
-		float offsetL=cycles->mStepCycles[i].mNormStepTrigger;
-		float offsetR=cycles->mStepCycles[i+1].mNormStepTrigger;
-		float lenL=cycles->mStepCycles[i].mNormDutyFactor;
-		float lenR=cycles->mStepCycles[i+1].mNormDutyFactor;
+		StepCycle* cycleL = &cycles->mStepCycles[i];
+		StepCycle* cycleR = &cycles->mStepCycles[i+1];
+		float offsetL=cycleL->mNormStepTrigger;
+		float offsetR=cycleR->mNormStepTrigger;
+		float lenL=cycleL->mNormDutyFactor;
+		float lenR=cycleR->mNormDutyFactor;
+
 		// feet
 		// left
-		gl::drawStrokedRect(Rectf(xpad-feetW,y1,xpad,y2));
+		Rectf foot = Rectf(xpad-feetW,y1,xpad,y2);
+		if (cycleL->isInStance(currentT))
+			gl::drawSolidRect(foot);
+		else
+			gl::drawStrokedRect(foot);
 		// right
-		gl::drawStrokedRect(Rectf(xpad+bodyW,y1,xpad+bodyW+feetW,y2));
+		foot = Rectf(xpad+bodyW,y1,xpad+bodyW+feetW,y2);
+		if (cycleR->isInStance(currentT))
+			gl::drawSolidRect(foot);
+		else
+			gl::drawStrokedRect(foot);
 		// timelines
 		// left
 		float lineStart=xpad-feetW-timelineLen-timelineFeetOffset;
@@ -188,13 +201,40 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 		gl::drawLine(Vec2f(lineStart,y1),Vec2f(lineEnd,y1));
 		glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) ); // front (contact time)
 		gl::drawLine(Vec2f(lineStart+timelineLen*offsetL,y1),Vec2f(lineStart+timelineLen*(offsetL+lenL),y1));
+		
+		// draw duty factor
+		mFont[fsize]->drawString(toString(cycleL->mNormDutyFactor),
+			Vec2f(lineStart+timelineLen*(offsetL+lenL*0.5f),y1+5+fsize));
+
+		// draw step trigger
+		glColor4f( ColorA( 0.5f, 1.0f, 1.0f, 1.0f ) );
+		mFont[fsize]->drawString(toString(cycleL->mNormStepTrigger),
+			Vec2f(lineStart+timelineLen*offsetL,y1-(5+fsize)));
+		
+		// Draw current time marker
+		glColor4f( ColorA( 0.0f, 1.0f, 0.5f, 1.0f ) );
+		gl::drawLine(Vec2f(lineStart+timelineLen*currentT,y1-1.0f),Vec2f(lineStart+timelineLen*currentT,y1+1.0f));
+
 		// right
 		lineStart=xpad+bodyW+feetW+timelineFeetOffset;
-		lineEnd=lineStart+timelineLen+timelineFeetOffset;
+		lineEnd=lineStart+timelineLen;
 		glColor4f( ColorA( 0.0f, 0.0f, 0.0f, 1.0f ) ); // back
 		gl::drawLine(Vec2f(lineStart,y1),Vec2f(lineEnd,y1));
 		glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) ); // front (contact time)
 		gl::drawLine(Vec2f(lineStart+timelineLen*offsetR,y1),Vec2f(lineStart+timelineLen*(offsetR+lenR),y1));
+		
+		// draw duty factor
+		mFont[fsize]->drawString(toString(cycleR->mNormDutyFactor),
+			Vec2f(lineStart+timelineLen*(offsetR+lenR*0.5f),y1+5+fsize));
+
+		// draw step trigger
+		glColor4f( ColorA( 0.5f, 1.0f, 1.0f, 1.0f ) );
+		mFont[fsize]->drawString(toString(cycleR->mNormStepTrigger),
+			Vec2f(lineStart+timelineLen*offsetR,y1-(5+fsize)));
+
+		// Draw current time marker
+		glColor4f( ColorA( 0.0f, 1.0f, 0.5f, 1.0f ) );
+		gl::drawLine(Vec2f(lineStart+timelineLen*currentT,y1-1.0f),Vec2f(lineStart+timelineLen*currentT,y1+1.0f));
 	}
 
 	p_baseLine+=bodyH+5.0f;

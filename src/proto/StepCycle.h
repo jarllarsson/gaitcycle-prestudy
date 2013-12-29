@@ -13,7 +13,7 @@
 /// Created on: 27-12-2013 
 ///---------------------------------------------------------------------------------------
 
-struct StepCycle
+class StepCycle
 {
 public:
 	///
@@ -29,4 +29,9 @@ public:
 	/// foot begins its cycle.
 	///
 	float mNormStepTrigger;
+
+	bool isInStance(float p_t)
+	{
+		return p_t>mNormStepTrigger&&p_t<mNormStepTrigger+mNormDutyFactor;
+	}
 };
