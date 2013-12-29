@@ -26,9 +26,10 @@ void AnimationPlayer::init()
 		{
 			StepCycle* stepCycle = &(mGaitCycle->mStepCycles[i]);
 			stepCycle->mNormDutyFactor = 0.3f;
-			stepCycle->mNormStepTrigger = ((float)i/n)-stepCycle->mNormDutyFactor;
-			if (stepCycle->mNormStepTrigger < 0.0f)
-				stepCycle->mNormStepTrigger = 0.0f;
+			stepCycle->mNormStepTrigger = ((float)i/(float)n);
+			// safety clamp
+			while (stepCycle->mNormStepTrigger+stepCycle->mNormDutyFactor > 1.0f)
+				stepCycle->mNormStepTrigger -= stepCycle->mNormDutyFactor;
 		}
 
 	}
