@@ -20,15 +20,27 @@ using namespace std;
 // We'll create a new Cinder Application by deriving from the AppBasic class
 class CinderApp : public AppBasic {
   public:
+
+
 	void mouseDrag( MouseEvent event );
 	void keyDown( KeyEvent event );
 	void prepareSettings( Settings *settings );
 	void setup();
+	void shutdown();
 	void update();
 	void draw();
 
+	void drawFPS(float& p_baseLine);
 	void drawGaitPhaseText(float& p_baseLine);
 	void visualizeGaitCycles(float& p_baseLine);
+
+	// windows timer
+	__int64 countsPerSec;
+	__int64 currTimeStamp;
+	double secsPerCount;
+	double dt;
+	double fps;
+	__int64 prevTimeStamp;
 
 	// This will maintain a list of points which we will draw line segments between
 	list<Vec3f>		mPoints;
@@ -40,7 +52,7 @@ class CinderApp : public AppBasic {
 	Vec3f			mCamUp;
 	Quatf			mCamRot;
 	float			mCamDist;
-	float mTextBaseLine;
+	float			mTextBaseLine;
 
 	gl::TextureFontRef*	mFont;
 	static const int	mMaxFontSize=20;
@@ -69,6 +81,20 @@ void CinderApp::keyDown( KeyEvent event )
 
 void CinderApp::prepareSettings( Settings *settings )
 {
+#if defined(_WIN32) && (defined(DEBUG) || defined(_DEBUG))
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+	SetThreadAffinityMask(GetCurrentThread(), 1);
+	countsPerSec=0;
+	prevTimeStamp=0;
+	currTimeStamp=0;
+	QueryPerformanceFrequency((LARGE_INTEGER*)&countsPerSec);
+	QueryPerformanceCounter((LARGE_INTEGER*)&prevTimeStamp);
+	QueryPerformanceCounter((LARGE_INTEGER*)&currTimeStamp);
+	dt=0.0;
+	fps=0.0;
+	secsPerCount = (double)(1.0f / (float)countsPerSec);
+
 	settings->setWindowSize( 800, 600 );
 	settings->setFrameRate( 60.0f );
 }
@@ -98,12 +124,25 @@ void CinderApp::setup()
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
 	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=50.0 max=1000.0 step=50.0 keyIncr=s keyDecr=w" );
 	mDebugInterface->addParam( "Phase", mPlayer.getGaitPhaseRef() );
-
 }
+
+
+void CinderApp::shutdown()
+{
+	delete [] mFont;
+}
+
 
 void CinderApp::update()
 {
-	mPlayer.update(1.0f/60.0f);
+	// Get Delta time	
+	prevTimeStamp = currTimeStamp;
+	QueryPerformanceCounter((LARGE_INTEGER*)&currTimeStamp);
+	dt = (currTimeStamp - prevTimeStamp) * secsPerCount;
+	dt = min(max(dt,0.0),0.7);
+	fps = 1.0/dt;
+
+	mPlayer.update((float)dt);
 
 	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 5.0f, 3000.0f );
 	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
@@ -143,6 +182,7 @@ void CinderApp::draw()
 	gl::disableDepthWrite();
 	float baseLine = mTextBaseLine;
 	gl::setMatricesWindow(getWindowWidth(),getWindowHeight());
+	drawFPS(baseLine);
 	drawGaitPhaseText(baseLine);
 	visualizeGaitCycles(baseLine);
 	mDebugInterface->draw();
@@ -183,28 +223,42 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 		// feet
 		// left
 		Rectf foot = Rectf(xpad-feetW,y1,xpad,y2);
+		bool leftHit=false;
+		bool rightHit=false;
 		if (cycleL->isInStance(currentT))
+		{
 			gl::drawSolidRect(foot);
+			leftHit=true;
+		}
 		else
 			gl::drawStrokedRect(foot);
 		// right
 		foot = Rectf(xpad+bodyW,y1,xpad+bodyW+feetW,y2);
 		if (cycleR->isInStance(currentT))
+		{
 			gl::drawSolidRect(foot);
+			rightHit=true;
+		}
 		else
 			gl::drawStrokedRect(foot);
 		// timelines
 		// left
 		float lineStart=xpad-feetW-timelineLen-timelineFeetOffset;
 		float lineEnd=xpad-feetW-timelineFeetOffset;
+		float dutyEnd = lineStart+timelineLen*(offsetL+lenL);
 		glColor4f( ColorA( 0.0f, 0.0f, 0.0f, 1.0f ) ); // back
 		gl::drawLine(Vec2f(lineStart,y1),Vec2f(lineEnd,y1));
-		glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) ); // front (contact time)
-		gl::drawLine(Vec2f(lineStart+timelineLen*offsetL,y1),Vec2f(lineStart+timelineLen*(offsetL+lenL),y1));
-		
+		if (!leftHit)
+			glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) ); // front (contact time)
+		else
+			glColor4f( ColorA( 1.0f, 0.2f, 0.7f, 1.0f ) );
+		gl::drawLine(Vec2f(lineStart+timelineLen*offsetL,y1),Vec2f(min(lineEnd,dutyEnd),y1));
+		if (offsetL+lenL>1.0f) // draw rest if out of bounds
+			gl::drawLine(Vec2f(lineStart,y1),Vec2f(lineStart+timelineLen*(offsetL+lenL-1.0f),y1));
+
 		// draw duty factor
 		mFont[fsize]->drawString(toString(cycleL->mNormDutyFactor),
-			Vec2f(lineStart+timelineLen*(offsetL+lenL*0.5f),y1+5+fsize));
+			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,1.0f),y1+5+fsize));
 
 		// draw step trigger
 		glColor4f( ColorA( 0.5f, 1.0f, 1.0f, 1.0f ) );
@@ -218,14 +272,20 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 		// right
 		lineStart=xpad+bodyW+feetW+timelineFeetOffset;
 		lineEnd=lineStart+timelineLen;
+		dutyEnd = lineStart+timelineLen*(offsetR+lenR);
 		glColor4f( ColorA( 0.0f, 0.0f, 0.0f, 1.0f ) ); // back
 		gl::drawLine(Vec2f(lineStart,y1),Vec2f(lineEnd,y1));
-		glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) ); // front (contact time)
-		gl::drawLine(Vec2f(lineStart+timelineLen*offsetR,y1),Vec2f(lineStart+timelineLen*(offsetR+lenR),y1));
-		
+		if (!rightHit)
+			glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) ); // front (contact time)
+		else
+			glColor4f( ColorA( 1.0f, 0.2f, 0.7f, 1.0f ) );
+		gl::drawLine(Vec2f(lineStart+timelineLen*offsetR,y1),Vec2f(min(lineEnd,dutyEnd),y1));
+		if (offsetR+lenR>1.0f)
+			gl::drawLine(Vec2f(lineStart,y1),Vec2f(lineStart+timelineLen*(offsetR+lenR-1.0f),y1));
+
 		// draw duty factor
 		mFont[fsize]->drawString(toString(cycleR->mNormDutyFactor),
-			Vec2f(lineStart+timelineLen*(offsetR+lenR*0.5f),y1+5+fsize));
+			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,1.0f),y1+5+fsize));
 
 		// draw step trigger
 		glColor4f( ColorA( 0.5f, 1.0f, 1.0f, 1.0f ) );
@@ -242,8 +302,16 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 
 void CinderApp::drawGaitPhaseText( float& p_baseLine )
 {
-	int fsize=10;
+	int fsize=15;
 	mFont[fsize]->drawString(toString(*mPlayer.getGaitPhaseRef()),
+		Vec2f(2.0f,p_baseLine));
+	p_baseLine+=(float)fsize;
+}
+
+void CinderApp::drawFPS( float& p_baseLine )
+{
+	int fsize=10;
+	mFont[fsize]->drawString(toString((int)fps),
 		Vec2f(2.0f,p_baseLine));
 	p_baseLine+=(float)fsize;
 }

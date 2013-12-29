@@ -32,6 +32,9 @@ public:
 
 	bool isInStance(float p_t)
 	{
-		return p_t>mNormStepTrigger&&p_t<mNormStepTrigger+mNormDutyFactor;
+		// p_t is always < 1
+		float max = mNormStepTrigger+mNormDutyFactor;
+		return (max<=1.0f && p_t>=mNormStepTrigger && p_t<max) || // if within bounds, if more than offset and less than offset+len
+			   (max>1.0f && ((p_t>=mNormStepTrigger) || p_t<max-1.0f) ); // if phase shifted out of bounds(>1), more than offset or less than len-1
 	}
 };

@@ -19,19 +19,19 @@ void AnimationPlayer::init()
 	{
 		int n=4;
 		mGaitCycle->mFeetCount = n;
-		mGaitCycle->mGaitPeriod = 1.0f;
+		mGaitCycle->mGaitPeriod = 5.0f;
 		mGaitCycle->mStepCycles = new StepCycle[n];
 		// Fill with appropriate data
 		float c=0.25f;
 		for (int i=0;i<n;i++)
 		{		
 			StepCycle* stepCycle = &(mGaitCycle->mStepCycles[i]);
-			stepCycle->mNormDutyFactor = 0.2f;
+			stepCycle->mNormDutyFactor = 0.5f;
 			stepCycle->mNormStepTrigger = c; // horse walk
 			// safety clamp
 			/*while (stepCycle->mNormStepTrigger+stepCycle->mNormDutyFactor > 1.0f)
 				stepCycle->mNormStepTrigger += 1.0f-(stepCycle->mNormStepTrigger+stepCycle->mNormDutyFactor);*/
-			if (stepCycle->mNormStepTrigger+stepCycle->mNormDutyFactor > 1.0f)
+			if (stepCycle->mNormStepTrigger > 1.0f)
 			{
 				stepCycle->mNormStepTrigger=0.0f;
 				c=0.0f;
