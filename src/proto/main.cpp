@@ -93,8 +93,8 @@ void CinderApp::setup()
 
 	// Debug interface
 	mDebugInterface = params::InterfaceGl::create( "Gait", Vec2i( 225, 200 ) );
-	mDebugInterface->setOptions("","Gait position='10 300'");
-	mDebugInterface->addParam( "Cam angle", &mCamRot, "visible=true");
+	mDebugInterface->setOptions("","position='10 300'");
+	mDebugInterface->addParam( "Cam angle", &mCamRot, "opened=true");
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
 	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=50.0 max=1000.0 step=50.0 keyIncr=s keyDecr=w" );
 	mDebugInterface->addParam( "Phase", mPlayer.getGaitPhaseRef() );
