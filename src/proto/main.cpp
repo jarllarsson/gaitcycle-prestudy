@@ -1,6 +1,6 @@
 
 //#include "CinderApp.h"
-
+#include <vld.h>
 #include "AnimationPlayer.h"
 
 #include "cinder/app/AppBasic.h"
@@ -12,6 +12,7 @@
 #include <string>
 #include "ToString.h"
 #include <cinder/gl/TextureFont.h>
+#include "Bone.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -33,6 +34,7 @@ class CinderApp : public AppBasic {
 	void drawFPS(float& p_baseLine);
 	void drawGaitPhaseText(float& p_baseLine);
 	void visualizeGaitCycles(float& p_baseLine);
+	void drawBones();
 
 	// windows timer
 	__int64 countsPerSec;
@@ -41,6 +43,7 @@ class CinderApp : public AppBasic {
 	double dt;
 	double fps;
 	__int64 prevTimeStamp;
+	float timeAccumulator;
 
 	// This will maintain a list of points which we will draw line segments between
 	list<Vec3f>		mPoints;
@@ -56,6 +59,9 @@ class CinderApp : public AppBasic {
 
 	gl::TextureFontRef*	mFont;
 	static const int	mMaxFontSize=20;
+
+	Bone mBone1Test;
+	Bone mBone2Test;
 
 	//
 	AnimationPlayer mPlayer;
@@ -93,6 +99,7 @@ void CinderApp::prepareSettings( Settings *settings )
 	QueryPerformanceCounter((LARGE_INTEGER*)&currTimeStamp);
 	dt=0.0;
 	fps=0.0;
+	timeAccumulator=0.0f;
 	secsPerCount = (double)(1.0f / (float)countsPerSec);
 
 	settings->setWindowSize( 800, 600 );
@@ -101,6 +108,9 @@ void CinderApp::prepareSettings( Settings *settings )
 
 void CinderApp::setup()
 {
+	mBone1Test = Bone(nullptr,3.0f);
+	mBone2Test = Bone(&mBone1Test,1.0f);
+
 	mTextBaseLine=20.0f;
 	mPlayer.init();
 	mFont = new gl::TextureFontRef[mMaxFontSize+1];
@@ -108,7 +118,7 @@ void CinderApp::setup()
 		mFont[i] = gl::TextureFont::create( Font( "Arial", (float)i+5.0f ));
 
 	// camera
-	mCamDist = 500.0f;
+	mCamDist = 10.0f;
 	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
 	mCamLookat = Vec3f::zero();
 	mCamUp = Vec3f::yAxis();
@@ -122,7 +132,7 @@ void CinderApp::setup()
 	mDebugInterface->setOptions("","position='10 300'");
 	mDebugInterface->addParam( "Cam angle", &mCamRot, "opened=true");
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
-	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=50.0 max=1000.0 step=50.0 keyIncr=s keyDecr=w" );
+	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=0.2 max=1000.0 step=1.0 keyIncr=s keyDecr=w" );
 	mDebugInterface->addParam( "Phase", mPlayer.getGaitPhaseRef() );
 }
 
@@ -141,6 +151,7 @@ void CinderApp::update()
 	dt = (currTimeStamp - prevTimeStamp) * secsPerCount;
 	dt = min(max(dt,0.0),0.7);
 	fps = 1.0/dt;
+	timeAccumulator+=dt;
 
 	mPlayer.update((float)dt);
 
@@ -175,7 +186,10 @@ void CinderApp::draw()
 
 	gl::end();
 	glColor4f( ColorA( 0.0f, 1.0f, 1.0f, 0.1f ) );
-	gl::drawColorCube( mCamLookat, Vec3f(10.0f,10.0f,10.0f) );
+	//gl::drawColorCube( mCamLookat, Vec3f(10.0f,10.0f,10.0f) );
+	gl::drawCoordinateFrame();
+
+	drawBones();
 
 	glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
 	gl::disableDepthRead();
@@ -314,6 +328,25 @@ void CinderApp::drawFPS( float& p_baseLine )
 	mFont[fsize]->drawString(toString((int)fps),
 		Vec2f(2.0f,p_baseLine));
 	p_baseLine+=(float)fsize;
+}
+
+void CinderApp::drawBones()
+{
+	mBone1Test.setRotation(timeAccumulator*0.3f);
+	mBone1Test.applyHierarchicalTransform();
+
+	mBone2Test.setRotation(-timeAccumulator);
+	mBone2Test.applyHierarchicalTransform();
+
+	glColor4f( ColorA( 1.0f, 1.0f, 0.5f, 1.0f ) );
+	Vec3f start=mBone1Test.getOrigin();
+	Vec3f end = mBone1Test.getEnd();
+	gl::drawVector(start,end);
+
+	glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
+	start=mBone2Test.getOrigin();
+	end = mBone2Test.getEnd();
+	gl::drawVector(start,end);
 }
 
 

@@ -14,3 +14,7 @@
 /obj
 /ext
 /ipch
+
+*.dll
+
+*.manifest
