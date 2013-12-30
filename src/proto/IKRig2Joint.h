@@ -1,27 +1,31 @@
 #pragma once
-#include <cinder\Vector.h>
-using namespace ci;
+#include "Foot.h"
+#include "Bone.h"
+
 // =======================================================================================
-//                                      Foot
+//                                      IKRig2Joint
 // =======================================================================================
 
 ///---------------------------------------------------------------------------------------
-/// \brief	A foot
+/// \brief	A super simple IK rig
 ///        
-/// # Foot
+/// # IKRig2Joint
 /// Detailed description.....
-/// Created on: 27-12-2013 
+/// Created on: 30-12-2013 
 ///---------------------------------------------------------------------------------------
 
-class Foot
+class IKRig2Joint
 {
 public:
-	Foot();
-	virtual ~Foot();
+	IKRig2Joint(Bone* p_parent, Foot* p_foot, float p_len);
+	virtual ~IKRig2Joint();
+	Bone* getUpperBone();
+	Bone* getLowerBone();
+	void updateRig();
 
-	Vec3f& getPosition();
-	void setPosition(Vec3f& p_pos);
 protected:
 private:
-	Vec3f mPos;
+	Foot* mFoot;
+	Bone* mUpperBone;
+	Bone* mLowerBone;
 };

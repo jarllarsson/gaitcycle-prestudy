@@ -4,7 +4,7 @@ Bone::Bone( Bone* p_parent/*=nullptr*/, float p_length/*=1.0f*/ )
 {
 	mParent=p_parent;
 	mLength=p_length;
-	mPoseDir=Vec3f(0.0f,-1.0f,0.0f);
+	mPoseDir=Vec3f(0.0f,0.0f,-1.0f);
 	mTransform=Matrix44<float>::identity();
 	reset();
 	applyHierarchicalTransform();
@@ -46,10 +46,7 @@ void Bone::setRotation( float p_angle )
 {
 	reset();
 	// Hardcoded as 1-DOF, on X-axis
-	Vec3f end1 = getEnd();
 	mTransform.rotate(Vec3f(1.0f,0.0f,0.0f),p_angle);
-	Vec3f end2 = getEnd();
-	int i=0;
 }
 
 void Bone::applyHierarchicalTransform()

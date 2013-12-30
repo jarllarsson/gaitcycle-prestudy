@@ -13,6 +13,8 @@
 #include "ToString.h"
 #include <cinder/gl/TextureFont.h>
 #include "Bone.h"
+#include "Foot.h"
+#include "IKRig2Joint.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -21,7 +23,6 @@ using namespace std;
 // We'll create a new Cinder Application by deriving from the AppBasic class
 class CinderApp : public AppBasic {
   public:
-
 
 	void mouseDrag( MouseEvent event );
 	void keyDown( KeyEvent event );
@@ -62,6 +63,9 @@ class CinderApp : public AppBasic {
 
 	Bone mBone1Test;
 	Bone mBone2Test;
+
+	IKRig2Joint* mLeg;
+	Foot* mFoot;
 
 	//
 	AnimationPlayer mPlayer;
@@ -108,6 +112,9 @@ void CinderApp::prepareSettings( Settings *settings )
 
 void CinderApp::setup()
 {
+	mFoot = new Foot();
+	mLeg = new IKRig2Joint(nullptr,mFoot,2.0f);
+
 	mBone1Test = Bone(nullptr,3.0f);
 	mBone2Test = Bone(&mBone1Test,1.0f);
 
@@ -139,6 +146,8 @@ void CinderApp::setup()
 
 void CinderApp::shutdown()
 {
+	delete mFoot;
+	delete mLeg;
 	delete [] mFont;
 }
 
@@ -151,13 +160,16 @@ void CinderApp::update()
 	dt = (currTimeStamp - prevTimeStamp) * secsPerCount;
 	dt = min(max(dt,0.0),0.7);
 	fps = 1.0/dt;
-	timeAccumulator+=dt;
+	timeAccumulator+=(float)dt;
 
 	mPlayer.update((float)dt);
 
 	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 5.0f, 3000.0f );
 	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
 	mCam.lookAt( mCamPos, mCamLookat, mCamUp );
+
+	mFoot->setPosition(Vec3f(0.0f,sin(timeAccumulator),cos(0.5f*timeAccumulator)));
+	mLeg->updateRig();
 }
 
 void CinderApp::draw()
@@ -335,7 +347,7 @@ void CinderApp::drawBones()
 	mBone1Test.setRotation(timeAccumulator*0.3f);
 	mBone1Test.applyHierarchicalTransform();
 
-	mBone2Test.setRotation(-timeAccumulator);
+	mBone2Test.setRotation(3.14*0.5f);
 	mBone2Test.applyHierarchicalTransform();
 
 	glColor4f( ColorA( 1.0f, 1.0f, 0.5f, 1.0f ) );
@@ -347,6 +359,19 @@ void CinderApp::drawBones()
 	start=mBone2Test.getOrigin();
 	end = mBone2Test.getEnd();
 	gl::drawVector(start,end);
+
+	// IK
+	glColor4f( ColorA( 1.0f, 0.0f, 0.0f, 1.0f ) );
+	start=mLeg->getUpperBone()->getOrigin();
+	end = mLeg->getUpperBone()->getEnd();
+	gl::drawVector(start,end);
+
+	glColor4f( ColorA( 1.0f, 0.0f, 1.0f, 1.0f ) );
+	start=mLeg->getLowerBone()->getOrigin();
+	end = mLeg->getLowerBone()->getEnd();
+	gl::drawVector(start,end);
+
+	gl::drawColorCube(mFoot->getPosition(),Vec3f(0.1f,0.1f,0.2f));
 }
 
 
