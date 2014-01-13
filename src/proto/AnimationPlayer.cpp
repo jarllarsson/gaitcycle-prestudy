@@ -19,7 +19,7 @@ void AnimationPlayer::init()
 	{
 		int n=4;
 		mGaitCycle->mFeetCount = n;
-		mGaitCycle->mGaitPeriod = 5.0f;
+		mGaitCycle->mGaitPeriod = 10.0f;
 		mGaitCycle->mStepCycles = new StepCycle[n];
 		// Fill with appropriate data
 		float c=0.25f;

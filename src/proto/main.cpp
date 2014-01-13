@@ -106,7 +106,7 @@ void CinderApp::prepareSettings( Settings *settings )
 	timeAccumulator=0.0f;
 	secsPerCount = (double)(1.0f / (float)countsPerSec);
 
-	settings->setWindowSize( 800, 600 );
+	settings->setWindowSize( 1280, 768 );
 	settings->setFrameRate( 60.0f );
 }
 
@@ -122,14 +122,14 @@ void CinderApp::setup()
 	mPlayer.init();
 	mFont = new gl::TextureFontRef[mMaxFontSize+1];
 	for (int i=0;i<=mMaxFontSize;i++)
-		mFont[i] = gl::TextureFont::create( Font( "Arial", (float)i+5.0f ));
+		mFont[i] = gl::TextureFont::create( Font( "Arial", (float)i+8.0f ));
 
 	// camera
 	mCamDist = 10.0f;
 	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
 	mCamLookat = Vec3f::zero();
 	mCamUp = Vec3f::yAxis();
-	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 5.0f, 3000.0f );
+	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 0.01f, 1000.0f );
 
 	// funny
 	myImage = gl::Texture( loadImage( loadAsset( "img.jpg" ) ) );
@@ -139,7 +139,7 @@ void CinderApp::setup()
 	mDebugInterface->setOptions("","position='10 300'");
 	mDebugInterface->addParam( "Cam angle", &mCamRot, "opened=true");
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
-	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=0.2 max=1000.0 step=1.0 keyIncr=s keyDecr=w" );
+	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=0.02 max=1000.0 step=1.0 keyIncr=s keyDecr=w" );
 	mDebugInterface->addParam( "Phase", mPlayer.getGaitPhaseRef() );
 }
 
@@ -277,8 +277,13 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 			gl::drawLine(Vec2f(lineStart,y1),Vec2f(lineStart+timelineLen*(offsetL+lenL-1.0f),y1));
 
 		// draw duty factor
-		mFont[fsize]->drawString(toString(cycleL->mNormDutyFactor),
+		mFont[fsize]->drawString(string("DF: ")+toString(cycleL->mNormDutyFactor),
 			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,1.0f),y1+5+fsize));
+
+		// draw swing phase
+		glColor4f( ColorA( 0.3f, 1.0f, 0.1f, 1.0f ) );
+		mFont[fsize]->drawString(string("swing: ")+toString(cycleL->getSwingPhase(currentT)),
+			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,1.0f),y1+15+fsize));
 
 		// draw step trigger
 		glColor4f( ColorA( 0.5f, 1.0f, 1.0f, 1.0f ) );
@@ -304,8 +309,13 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 			gl::drawLine(Vec2f(lineStart,y1),Vec2f(lineStart+timelineLen*(offsetR+lenR-1.0f),y1));
 
 		// draw duty factor
-		mFont[fsize]->drawString(toString(cycleR->mNormDutyFactor),
+		mFont[fsize]->drawString(string("DF: ")+toString(cycleR->mNormDutyFactor),
 			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,1.0f),y1+5+fsize));
+
+		// draw swing phase
+		glColor4f( ColorA( 0.3f, 1.0f, 0.1f, 1.0f ) );
+		mFont[fsize]->drawString(string("swing: ")+toString(cycleR->getSwingPhase(currentT)),
+			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,1.0f),y1+15+fsize));
 
 		// draw step trigger
 		glColor4f( ColorA( 0.5f, 1.0f, 1.0f, 1.0f ) );
@@ -368,7 +378,7 @@ void CinderApp::visualizeSkeleton()
 	gl::drawColorCube(Vec3f(0.0f,heightFromGround,0.0f),Vec3f(bodyW,bodyH,bodyL));
 	gl::drawColorCube(Vec3f(0.0f,heightFromGround,bodyL*0.5f),Vec3f(0.3f,0.3f,0.3f));
 
-	// Draw feet visualization
+	// Draw leg+feet visualization
 	for (int i=0;i<cycles->mFeetCount;i+=2)
 	{
 		StepCycle* cycleL = &cycles->mStepCycles[i];
