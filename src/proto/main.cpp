@@ -34,6 +34,7 @@ class CinderApp : public AppBasic {
 
 	void drawFPS(float& p_baseLine);
 	void drawGaitPhaseText(float& p_baseLine);
+	void visualizeSkeleton();
 	void visualizeGaitCycles(float& p_baseLine);
 	void drawBones();
 
@@ -47,7 +48,6 @@ class CinderApp : public AppBasic {
 	float timeAccumulator;
 
 	// This will maintain a list of points which we will draw line segments between
-	list<Vec3f>		mPoints;
 	gl::Texture		myImage;
 	// camera
 	CameraPersp		mCam;
@@ -76,11 +76,11 @@ class CinderApp : public AppBasic {
 
 void CinderApp::mouseDrag( MouseEvent event )
 {
-	Vec2f epos = event.getPos();
-	Vec3f wpos = Vec3f(((epos.x/getWindowWidth())*2.0f - 1.0f)*mCamDist,-((epos.y/getWindowHeight())*2.0f - 1.0f)*mCamDist,-1.0f);
-	Matrix44f wmat = mCamRot.toMatrix44();
-	wpos = wmat.transformPoint(wpos);
-	mPoints.push_back(wpos);
+// 	Vec2f epos = event.getPos();
+// 	Vec3f wpos = Vec3f(((epos.x/getWindowWidth())*2.0f - 1.0f)*mCamDist,-((epos.y/getWindowHeight())*2.0f - 1.0f)*mCamDist,-1.0f);
+// 	Matrix44f wmat = mCamRot.toMatrix44();
+// 	wpos = wmat.transformPoint(wpos);
+// 	mPoints.push_back(wpos);
 }
 
 void CinderApp::keyDown( KeyEvent event )
@@ -188,19 +188,11 @@ void CinderApp::draw()
 	gl::enableAlphaBlending();
 
 
-	gl::color( 1.0f, 1.0f, 1.0f );	
-
-	gl::color( 1.0f, 0.5f, 0.25f );	
-	gl::begin( GL_LINE_STRIP );
-	for( auto pointIter = mPoints.begin(); pointIter != mPoints.end(); ++pointIter ) {
-		gl::vertex( *pointIter );
-	}
-
-	gl::end();
 	glColor4f( ColorA( 0.0f, 1.0f, 1.0f, 0.1f ) );
 	//gl::drawColorCube( mCamLookat, Vec3f(10.0f,10.0f,10.0f) );
 	gl::drawCoordinateFrame();
 
+	visualizeSkeleton();
 	drawBones();
 
 	glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
@@ -228,7 +220,9 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 	float bodyW=50.0f;
 	float bodyH=(float)(cycles->mFeetCount-1)*(feetH+feetMargin)+feetMargin;
 	// Draw body visualization		
-	gl::drawStrokedRect(Rectf(xpad,p_baseLine,xpad+bodyW,p_baseLine+bodyH));
+	p_baseLine+=feetH;
+	gl::drawStrokedRect(Rectf(xpad,p_baseLine,xpad+bodyW,p_baseLine+bodyH)); // body
+	gl::drawStrokedRect(Rectf(xpad+(bodyW-feetW)*0.5f,p_baseLine,xpad+(bodyW+feetW)*0.5f,p_baseLine-feetH)); // head
 	p_baseLine+=feetMargin;
 
 	int fsize=5;
@@ -344,26 +338,11 @@ void CinderApp::drawFPS( float& p_baseLine )
 
 void CinderApp::drawBones()
 {
-	mBone1Test.setRotation(timeAccumulator*0.3f);
-	mBone1Test.applyHierarchicalTransform();
-
-	mBone2Test.setRotation(3.14*0.5f);
-	mBone2Test.applyHierarchicalTransform();
-
-	glColor4f( ColorA( 1.0f, 1.0f, 0.5f, 1.0f ) );
-	Vec3f start=mBone1Test.getOrigin();
-	Vec3f end = mBone1Test.getEnd();
-	gl::drawVector(start,end);
-
-	glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
-	start=mBone2Test.getOrigin();
-	end = mBone2Test.getEnd();
-	gl::drawVector(start,end);
 
 	// IK
 	glColor4f( ColorA( 1.0f, 0.0f, 0.0f, 1.0f ) );
-	start=mLeg->getUpperBone()->getOrigin();
-	end = mLeg->getUpperBone()->getEnd();
+	Vec3f start=mLeg->getUpperBone()->getOrigin();
+	Vec3f end = mLeg->getUpperBone()->getEnd();
 	gl::drawVector(start,end);
 
 	glColor4f( ColorA( 1.0f, 0.0f, 1.0f, 1.0f ) );
@@ -372,6 +351,47 @@ void CinderApp::drawBones()
 	gl::drawVector(start,end);
 
 	gl::drawColorCube(mFoot->getPosition(),Vec3f(0.1f,0.1f,0.2f));
+}
+
+void CinderApp::visualizeSkeleton()
+{
+	GaitCycle* cycles = mPlayer.getGaitDataRef();
+
+	float currentT=*mPlayer.getGaitPhaseRef();
+	float heightFromGround=1.0f;
+	float legMargin=1.0f;
+	float bodyW=1.0f;
+	float bodyH=1.0f;
+	float jointSz=0.3f;
+	float bodyL=(float)(cycles->mFeetCount-1)*legMargin+legMargin;
+
+	gl::drawColorCube(Vec3f(0.0f,heightFromGround,0.0f),Vec3f(bodyW,bodyH,bodyL));
+	gl::drawColorCube(Vec3f(0.0f,heightFromGround,bodyL*0.5f),Vec3f(0.3f,0.3f,0.3f));
+
+	// Draw feet visualization
+	for (int i=0;i<cycles->mFeetCount;i+=2)
+	{
+		StepCycle* cycleL = &cycles->mStepCycles[i];
+		StepCycle* cycleR = &cycles->mStepCycles[i+1];
+
+		// left
+		gl::drawColorCube(Vec3f(bodyW*0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i),
+			Vec3f(jointSz,jointSz,jointSz));
+		if (cycleL->isInStance(currentT))
+		{
+			gl::drawCube(Vec3f(bodyW*0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i),
+				Vec3f(jointSz,jointSz,jointSz)*2.0f);
+		}
+
+		// right
+		gl::drawColorCube(Vec3f(bodyW*-0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i),
+			Vec3f(jointSz,jointSz,jointSz));
+		if (cycleR->isInStance(currentT))
+		{
+			gl::drawCube(Vec3f(bodyW*-0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i),
+				Vec3f(jointSz,jointSz,jointSz)*2.0f);
+		}
+	}
 }
 
 
