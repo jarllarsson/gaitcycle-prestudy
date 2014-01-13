@@ -5,8 +5,6 @@
 *.sdf
 *.ilk
 *.pdb
-*.vcxproj.filters
-*.vcxproj.user
 *.opensdf
 *.suo
 

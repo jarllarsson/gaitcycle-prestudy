@@ -1,4 +1,7 @@
 #include "AnimationPlayer.h"
+#define _USE_MATH_DEFINES
+#include <math.h>
+using namespace std;
 
 AnimationPlayer::AnimationPlayer()
 {
@@ -6,6 +9,7 @@ AnimationPlayer::AnimationPlayer()
 	mGaitPhase=0.0f;
 	mStrideLength=1.0f;
 	mSwingHeight=1.0f;
+	m_easing = EASING_STATE::COSINE_INV_NORM;
 }
 
 AnimationPlayer::~AnimationPlayer()
@@ -19,7 +23,7 @@ void AnimationPlayer::init()
 	{
 		int n=4;
 		mGaitCycle->mFeetCount = n;
-		mGaitCycle->mGaitPeriod = 10.0f;
+		mGaitCycle->mGaitPeriod = 2.0f;
 		mGaitCycle->mStepCycles = new StepCycle[n];
 		// Fill with appropriate data
 		float c=0.25f;
@@ -57,4 +61,37 @@ GaitCycle* AnimationPlayer::getGaitDataRef() const
 float* AnimationPlayer::getGaitPhaseRef()
 {
 	return &mGaitPhase;
+}
+
+float AnimationPlayer::easeCosineInvNorm( float p_t )
+{
+	return (cos(p_t*2.0f*M_PI)-1.0f)*-0.5f;
+}
+
+float AnimationPlayer::easeHalfSine( float p_t )
+{
+	return sin(p_t*M_PI);
+}
+
+AnimationPlayer::EASING_STATE* AnimationPlayer::getEasingStateRef()
+{
+	return &m_easing;
+}
+
+void AnimationPlayer::setEasingState( EASING_STATE p_state )
+{
+	m_easing=p_state;
+}
+
+float AnimationPlayer::autoEase( float p_t )
+{
+	switch(m_easing)
+	{
+	case COSINE_INV_NORM:
+		return easeCosineInvNorm(p_t);
+	case HALF_SINE:
+		return easeHalfSine(p_t);
+	default:
+		return easeCosineInvNorm(p_t);
+	}
 }

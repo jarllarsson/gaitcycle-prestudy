@@ -36,6 +36,7 @@ class CinderApp : public AppBasic {
 	void drawGaitPhaseText(float& p_baseLine);
 	void visualizeSkeleton();
 	void visualizeGaitCycles(float& p_baseLine);
+	void drawSwingEaseGraph(float p_xoffset, float y_offset, float p_width, float p_height);
 	void drawBones();
 
 	// windows timer
@@ -141,6 +142,10 @@ void CinderApp::setup()
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
 	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=0.02 max=1000.0 step=1.0 keyIncr=s keyDecr=w" );
 	mDebugInterface->addParam( "Phase", mPlayer.getGaitPhaseRef() );
+	vector<string> easingNames;
+	easingNames.push_back("COSINE_INV_NORM");
+	easingNames.push_back("HALF_SINE");
+	mDebugInterface->addParam( "Easing", easingNames,(int*)mPlayer.getEasingStateRef() );
 }
 
 
@@ -216,7 +221,7 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 	float xpad=30.0f+timelineLen+timelineFeetOffset;
 	float feetW=10.0f;
 	float feetH=10.0f;
-	float feetMargin=10.0f;
+	float feetMargin=15.0f;
 	float bodyW=50.0f;
 	float bodyH=(float)(cycles->mFeetCount-1)*(feetH+feetMargin)+feetMargin;
 	// Draw body visualization		
@@ -281,8 +286,8 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,1.0f),y1+5+fsize));
 
 		// draw swing phase
-		glColor4f( ColorA( 0.3f, 1.0f, 0.1f, 1.0f ) );
-		mFont[fsize]->drawString(string("swing: ")+toString(cycleL->getSwingPhase(currentT)),
+		glColor4f( ColorA( 0.8f, 1.0f, 0.1f, 1.0f ) );
+		mFont[fsize]->drawString(string("swing: ")+toString(cycleL->getSwingPhase(currentT),4),
 			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,1.0f),y1+15+fsize));
 
 		// draw step trigger
@@ -293,6 +298,7 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 		// Draw current time marker
 		glColor4f( ColorA( 0.0f, 1.0f, 0.5f, 1.0f ) );
 		gl::drawLine(Vec2f(lineStart+timelineLen*currentT,y1-1.0f),Vec2f(lineStart+timelineLen*currentT,y1+1.0f));
+
 
 		// right
 		lineStart=xpad+bodyW+feetW+timelineFeetOffset;
@@ -313,8 +319,8 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,1.0f),y1+5+fsize));
 
 		// draw swing phase
-		glColor4f( ColorA( 0.3f, 1.0f, 0.1f, 1.0f ) );
-		mFont[fsize]->drawString(string("swing: ")+toString(cycleR->getSwingPhase(currentT)),
+		glColor4f( ColorA( 0.8f, 1.0f, 0.1f, 1.0f ) );
+		mFont[fsize]->drawString(string("swing: ")+toString(cycleR->getSwingPhase(currentT),4),
 			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,1.0f),y1+15+fsize));
 
 		// draw step trigger
@@ -328,6 +334,11 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 	}
 
 	p_baseLine+=bodyH+5.0f;
+
+	// Draw ease function
+	drawSwingEaseGraph( xpad, p_baseLine, bodyW, feetH*2.0f );
+
+	p_baseLine+=feetH*2.0f;
 }
 
 void CinderApp::drawGaitPhaseText( float& p_baseLine )
@@ -402,6 +413,23 @@ void CinderApp::visualizeSkeleton()
 				Vec3f(jointSz,jointSz,jointSz)*2.0f);
 		}
 	}
+}
+
+void CinderApp::drawSwingEaseGraph( float p_xoffset, float y_offset, float p_width, float p_height )
+{
+	// draw ease function
+	gl::color( 1.0f, 0.5f, 0.25f );  
+	gl::begin( GL_LINE_STRIP );
+	int numpoints=20;
+	p_height*=0.5f;
+	for( int i=0; i<=numpoints; i++ ) 
+	{
+		float e_t=((float)i/(float)numpoints);
+		gl::vertex(p_xoffset+e_t*p_width,y_offset+p_height-mPlayer.autoEase(e_t)*p_height);
+	}
+	gl::end();
+	gl::color( 0.7f, 0.5f, 0.25f ); 
+	gl::drawLine(Vec2f(p_xoffset,y_offset+p_height),Vec2f(p_xoffset+p_width,y_offset+p_height));
 }
 
 

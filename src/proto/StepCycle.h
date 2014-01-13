@@ -33,9 +33,9 @@ public:
 	bool isInStance(float p_t)
 	{
 		// p_t is always < 1
-		float max = mNormStepTrigger+mNormDutyFactor;
-		return (max<=1.0f && p_t>=mNormStepTrigger && p_t<max) || // if within bounds, if more than offset and less than offset+len
-			   (max>1.0f && ((p_t>=mNormStepTrigger) || p_t<max-1.0f) ); // if phase shifted out of bounds(>1), more than offset or less than len-1
+		float maxt = mNormStepTrigger+mNormDutyFactor;
+		return (maxt<=1.0f && p_t>=mNormStepTrigger && p_t<maxt) || // if within bounds, if more than offset and less than offset+len
+			   (maxt>1.0f && ((p_t>=mNormStepTrigger) || p_t<maxt-1.0f) ); // if phase shifted out of bounds(>1), more than offset or less than len-1
 	}
 
 	//
@@ -46,22 +46,24 @@ public:
 	{
 		// p_t is always < 1
 		if (isInStance(p_t)) return 0.0f;
-		float max = mNormStepTrigger+mNormDutyFactor;
+		float maxt = mNormStepTrigger+mNormDutyFactor;
 		float pos=p_t;
-		if (max<=1.0f)
+		float swinglen = 1.0f-mNormDutyFactor; // get total swing time
+		if (maxt<=1.0f) // max is inside bounds
 		{
-			float rest = 1.0f-max; // rightmost rest swing
-			float swinglen = 1.0f-mNormDutyFactor; // get total swing time
-			if (p_t>max) 
-				pos-=max; // get start as after end of stance		
+			float rest = 1.0f-maxt; // rightmost rest swing			
+			if (p_t>maxt) 
+				pos-=maxt; // get start as after end of stance		
 			else
 				pos+=rest; // add rest when at beginning again
 			pos /= swinglen; // normalize
 			//pos= 1.0f-pos; // invert
 		}
-		else
+		else // max is outside bounds
 		{
-			float rest = max-1.0f;
+			float mint=maxt-1.0f; // start
+			pos -= mint;
+			pos /= swinglen;
 		}
 		return pos;
 	}
