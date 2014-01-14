@@ -37,7 +37,7 @@ class CinderApp : public AppBasic {
 	void visualizeSkeleton();
 	void visualizeGaitCycles(float& p_baseLine);
 	void drawSwingEaseGraph(float p_xoffset, float y_offset, float p_width, float p_height);
-	void drawBones();
+	void drawBones(int p_idx, Vec3f p_offset);
 
 	// windows timer
 	__int64 countsPerSec;
@@ -62,11 +62,9 @@ class CinderApp : public AppBasic {
 	gl::TextureFontRef*	mFont;
 	static const int	mMaxFontSize=20;
 
-	Bone mBone1Test;
-	Bone mBone2Test;
-
-	IKRig2Joint* mLeg;
-	Foot* mFoot;
+	float mDistToGround;
+	IKRig2Joint** mLeg;
+	Foot** mFoot;
 
 	//
 	AnimationPlayer mPlayer;
@@ -113,17 +111,24 @@ void CinderApp::prepareSettings( Settings *settings )
 
 void CinderApp::setup()
 {
-	mFoot = new Foot();
-	mLeg = new IKRig2Joint(nullptr,mFoot,2.0f);
-
-	mBone1Test = Bone(nullptr,3.0f);
-	mBone2Test = Bone(&mBone1Test,1.0f);
-
+	// main
 	mTextBaseLine=20.0f;
 	mPlayer.init();
 	mFont = new gl::TextureFontRef[mMaxFontSize+1];
 	for (int i=0;i<=mMaxFontSize;i++)
 		mFont[i] = gl::TextureFont::create( Font( "Arial", (float)i+8.0f ));
+
+	// legs and feet
+	mDistToGround=2.0f;
+	int numfeet=mPlayer.getGaitDataRef()->mFeetCount;
+	mFoot = new Foot*[numfeet];
+	mLeg = new IKRig2Joint*[numfeet];
+	for (int i=0;i<numfeet;i++)
+	{
+		mFoot[i]=new Foot();
+		mLeg[i]=new IKRig2Joint(nullptr,mFoot[i],mDistToGround+0.3f);
+	}
+
 
 	// camera
 	mCamDist = 10.0f;
@@ -136,7 +141,7 @@ void CinderApp::setup()
 	myImage = gl::Texture( loadImage( loadAsset( "img.jpg" ) ) );
 
 	// Debug interface
-	mDebugInterface = params::InterfaceGl::create( "Gait", Vec2i( 225, 200 ) );
+	mDebugInterface = params::InterfaceGl::create( "Gait", Vec2i( 225, 300 ) );
 	mDebugInterface->setOptions("","position='10 300'");
 	mDebugInterface->addParam( "Cam angle", &mCamRot, "opened=true");
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
@@ -146,13 +151,22 @@ void CinderApp::setup()
 	easingNames.push_back("COSINE_INV_NORM");
 	easingNames.push_back("HALF_SINE");
 	mDebugInterface->addParam( "Easing", easingNames,(int*)mPlayer.getEasingStateRef() );
+	mDebugInterface->addParam( "Cycle time", &mPlayer.getGaitDataRef()->mGaitPeriod, "min=0.02 max=30.0 step=0.01" );
+	mDebugInterface->addParam( "Swing height", mPlayer.getSwingHeightRef(), "min=0.02 max=5.0 step=0.01" );
+	mDebugInterface->addParam( "Stride length", mPlayer.getStrideLengthRef(), "min=0.02 max=5.0 step=0.01" );
+	mDebugInterface->addParam( "Ground dist", &mDistToGround, "min=0.02 max=5.0 step=0.01" );
 }
 
 
 void CinderApp::shutdown()
-{
-	delete mFoot;
-	delete mLeg;
+{	
+	for (int i=0;i<mPlayer.getGaitDataRef()->mFeetCount;i++)
+	{
+		delete mFoot[i];
+		delete mLeg[i];
+	}
+	delete [] mFoot;
+	delete [] mLeg;
 	delete [] mFont;
 }
 
@@ -173,8 +187,20 @@ void CinderApp::update()
 	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
 	mCam.lookAt( mCamPos, mCamLookat, mCamUp );
 
-	mFoot->setPosition(Vec3f(0.0f,sin(timeAccumulator),cos(0.5f*timeAccumulator)));
-	mLeg->updateRig();
+
+	// update feet	
+	GaitCycle* gaitCycle=mPlayer.getGaitDataRef();
+	float p_gt=*mPlayer.getGaitPhaseRef();
+	for (int i=0;i < gaitCycle->mFeetCount;i++)
+	{
+		StepCycle* sc=&gaitCycle->mStepCycles[i];
+		float nstepoffset=p_gt-sc->mNormStepTrigger;
+		if (nstepoffset<0.0f) nstepoffset+=1.0f;
+		mFoot[i]->setPosition(Vec3f(0.0f,
+							 mPlayer.getSwingHeight()*mPlayer.autoEase(sc->getSwingPhase(p_gt))-mDistToGround,
+							 mPlayer.getStrideLength()*cos(2.0f*M_PI*(nstepoffset))));
+		mLeg[i]->updateRig();
+	}
 }
 
 void CinderApp::draw()
@@ -198,7 +224,9 @@ void CinderApp::draw()
 	gl::drawCoordinateFrame();
 
 	visualizeSkeleton();
-	drawBones();
+
+	glColor4f( ColorA( 0.1f, 0.7f, 0.1f, 1.0f ) );
+	gl::drawCube(Vec3f(0.0f,-mDistToGround,0.0f),Vec3f(4.0f,0.01f,5.0f));
 
 	glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
 	gl::disableDepthRead();
@@ -357,21 +385,22 @@ void CinderApp::drawFPS( float& p_baseLine )
 	p_baseLine+=(float)fsize;
 }
 
-void CinderApp::drawBones()
+void CinderApp::drawBones( int p_idx, Vec3f p_offset )
 {
 
 	// IK
+	IKRig2Joint* leg=mLeg[p_idx];
 	glColor4f( ColorA( 1.0f, 0.0f, 0.0f, 1.0f ) );
-	Vec3f start=mLeg->getUpperBone()->getOrigin();
-	Vec3f end = mLeg->getUpperBone()->getEnd();
-	gl::drawVector(start,end);
+	Vec3f start=leg->getUpperBone()->getOrigin();
+	Vec3f end = leg->getUpperBone()->getEnd();
+	gl::drawVector(p_offset+start,p_offset+end);
 
 	glColor4f( ColorA( 1.0f, 0.0f, 1.0f, 1.0f ) );
-	start=mLeg->getLowerBone()->getOrigin();
-	end = mLeg->getLowerBone()->getEnd();
-	gl::drawVector(start,end);
+	start=leg->getLowerBone()->getOrigin();
+	end = leg->getLowerBone()->getEnd();
+	gl::drawVector(p_offset+start,p_offset+end);
 
-	gl::drawColorCube(mFoot->getPosition(),Vec3f(0.1f,0.1f,0.2f));
+	gl::drawColorCube(p_offset+mFoot[p_idx]->getPosition(),Vec3f(0.1f,0.1f,0.2f));
 }
 
 void CinderApp::visualizeSkeleton()
@@ -379,10 +408,10 @@ void CinderApp::visualizeSkeleton()
 	GaitCycle* cycles = mPlayer.getGaitDataRef();
 
 	float currentT=*mPlayer.getGaitPhaseRef();
-	float heightFromGround=1.0f;
 	float legMargin=1.0f;
 	float bodyW=1.0f;
 	float bodyH=1.0f;
+	float heightFromGround=bodyH*0.5f;
 	float jointSz=0.3f;
 	float bodyL=(float)(cycles->mFeetCount-1)*legMargin+legMargin;
 
@@ -395,23 +424,33 @@ void CinderApp::visualizeSkeleton()
 		StepCycle* cycleL = &cycles->mStepCycles[i];
 		StepCycle* cycleR = &cycles->mStepCycles[i+1];
 
-		// left
-		gl::drawColorCube(Vec3f(bodyW*0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i),
+		// LEFT
+		// left leg joint
+		Vec3f offset=Vec3f(bodyW*0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i);
+		gl::drawColorCube(offset,
 			Vec3f(jointSz,jointSz,jointSz));
 		if (cycleL->isInStance(currentT))
 		{
-			gl::drawCube(Vec3f(bodyW*0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i),
+			glColor4f( ColorA( 0.0f, 1.0f, 1.0f, 0.1f ) );
+			gl::drawCube(offset,
 				Vec3f(jointSz,jointSz,jointSz)*2.0f);
 		}
+		// left leg and foot
+		drawBones(i,offset);
 
-		// right
-		gl::drawColorCube(Vec3f(bodyW*-0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i),
+		// RIGHT
+		// right leg joing
+		offset=Vec3f(bodyW*-0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i);
+		gl::drawColorCube(offset,
 			Vec3f(jointSz,jointSz,jointSz));
 		if (cycleR->isInStance(currentT))
 		{
-			gl::drawCube(Vec3f(bodyW*-0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i),
+			glColor4f( ColorA( 0.0f, 1.0f, 1.0f, 0.1f ) );
+			gl::drawCube(offset,
 				Vec3f(jointSz,jointSz,jointSz)*2.0f);
 		}
+		// right leg and foot
+		drawBones(i+1,offset);
 	}
 }
 

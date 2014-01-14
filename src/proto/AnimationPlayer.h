@@ -32,6 +32,13 @@ public:
 	EASING_STATE* getEasingStateRef();
 	void setEasingState(EASING_STATE p_state);
 
+	void setStrideLength(float p_value);
+	void setSwingHeight(float p_value);
+	float getStrideLength();
+	float getSwingHeight();
+	float* getStrideLengthRef();
+	float* getSwingHeightRef();
+
 	float autoEase(float p_t);
 	float easeCosineInvNorm(float p_t);
 	float easeHalfSine(float p_t);

@@ -35,6 +35,7 @@ void IKRig2Joint::updateRig()
 	// first get offset angle beetween foot and axis
 	float offsetAngle = atan2(topToFoot.y,-topToFoot.z);
 	// If dist to foot is shorter than combined leg length
+	bool straightLeg=false;
 	if (toFootLen<uB+lB)
 	{
 		float uBS = uB*uB;
@@ -42,14 +43,16 @@ void IKRig2Joint::updateRig()
 		float hBS = toFootLen*toFootLen;
 		// law of cosines for first angle
 		upperLegAngle = acos((hBS + uBS - lBS)/(2.0f*uB*toFootLen))+offsetAngle;
-		// law of cosines for second angle
+		// second angle
 		Vec2f newLeg = Vec2f(uB*cos(upperLegAngle),uB*sin(upperLegAngle));
 		lowerLegAngle = atan2(topToFoot.y-newLeg.y,-topToFoot.z-newLeg.x)-upperLegAngle;
 		/*lowerLegAngle = acos((uBS + lBS - hBS)/(2.0f*uB*lB))-upperLegAngle;*/
 	}
 	else // otherwise, straight leg
 	{
-		upperLegAngle=lowerLegAngle=offsetAngle;
+		upperLegAngle=offsetAngle;
+		lowerLegAngle=0.0f;
+		straightLeg=true;
 	}
 	
 	// update bones
@@ -57,4 +60,7 @@ void IKRig2Joint::updateRig()
 	mUpperBone->applyHierarchicalTransform();
 	mLowerBone->setRotation(lowerLegAngle);
 	mLowerBone->applyHierarchicalTransform();
+
+	if (straightLeg)
+		mFoot->setPosition(mLowerBone->getEnd());
 }

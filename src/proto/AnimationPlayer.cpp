@@ -95,3 +95,34 @@ float AnimationPlayer::autoEase( float p_t )
 		return easeCosineInvNorm(p_t);
 	}
 }
+
+void AnimationPlayer::setStrideLength( float p_value )
+{
+	mStrideLength=p_value;
+}
+
+void AnimationPlayer::setSwingHeight( float p_value )
+{
+	mSwingHeight=p_value;
+}
+
+float AnimationPlayer::getStrideLength()
+{
+	return mStrideLength;
+}
+
+float AnimationPlayer::getSwingHeight()
+{
+	return mSwingHeight;
+}
+
+float* AnimationPlayer::getStrideLengthRef()
+{
+	return &mStrideLength;
+}
+
+float* AnimationPlayer::getSwingHeightRef()
+{
+	return &mSwingHeight;
+}
+
