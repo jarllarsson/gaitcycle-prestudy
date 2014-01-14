@@ -1,10 +1,11 @@
 #include "IKRig2Joint.h"
 
-IKRig2Joint::IKRig2Joint( Bone* p_parent, Foot* p_foot, float p_len )
+IKRig2Joint::IKRig2Joint( Bone* p_parent, Foot* p_foot, float p_len, JOINT_TYPE p_joint )
 {
 	mUpperBone=new Bone(p_parent,p_len*0.5f);
 	mLowerBone=new Bone(mUpperBone,p_len*0.5f);
 	mFoot=p_foot;
+	mJointType=p_joint;
 }
 
 IKRig2Joint::~IKRig2Joint()
@@ -25,6 +26,9 @@ Bone* IKRig2Joint::getLowerBone()
 
 void IKRig2Joint::updateRig()
 {
+	int kneeFlip=1;
+	if (mJointType==JOINT_TYPE::BIRD_FAKE_APPROX)
+		kneeFlip=-1;
 	Vec3f footPos=mFoot->getPosition();
 	Vec3f topToFoot = footPos-mUpperBone->getOrigin();
 	float toFootLen = topToFoot.length();
@@ -42,7 +46,7 @@ void IKRig2Joint::updateRig()
 		float lBS = lB*lB;
 		float hBS = toFootLen*toFootLen;
 		// law of cosines for first angle
-		upperLegAngle = acos((hBS + uBS - lBS)/(2.0f*uB*toFootLen))+offsetAngle;
+		upperLegAngle = (-1*kneeFlip)*acos((hBS + uBS - lBS)/(2.0f*uB*toFootLen))+offsetAngle;
 		// second angle
 		Vec2f newLeg = Vec2f(uB*cos(upperLegAngle),uB*sin(upperLegAngle));
 		lowerLegAngle = atan2(topToFoot.y-newLeg.y,-topToFoot.z-newLeg.x)-upperLegAngle;
@@ -63,4 +67,14 @@ void IKRig2Joint::updateRig()
 
 	if (straightLeg)
 		mFoot->setPosition(mLowerBone->getEnd());
+}
+
+IKRig2Joint::JOINT_TYPE* IKRig2Joint::getJointTypeRef()
+{
+	return &mJointType;
+}
+
+void IKRig2Joint::setJointType( JOINT_TYPE p_jointType )
+{
+	mJointType=p_jointType;
 }

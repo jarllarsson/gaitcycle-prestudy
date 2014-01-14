@@ -6,6 +6,7 @@ using namespace std;
 AnimationPlayer::AnimationPlayer()
 {
 	mGaitCycle = new GaitCycle;
+	mGaitCycle->mStepCycles = nullptr;
 	mGaitPhase=0.0f;
 	mStrideLength=1.0f;
 	mSwingHeight=1.0f;
@@ -17,11 +18,14 @@ AnimationPlayer::~AnimationPlayer()
 	delete mGaitCycle;
 }
 
-void AnimationPlayer::init()
+void AnimationPlayer::init( int p_feetCount/*=4*/ )
 {
 	if (mGaitCycle)
 	{
-		int n=4;
+		if (mGaitCycle->mStepCycles!=nullptr)
+			delete [] mGaitCycle->mStepCycles;
+		//
+		int n=p_feetCount;
 		mGaitCycle->mFeetCount = n;
 		mGaitCycle->mGaitPeriod = 2.0f;
 		mGaitCycle->mStepCycles = new StepCycle[n];

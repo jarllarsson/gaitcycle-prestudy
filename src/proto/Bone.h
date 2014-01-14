@@ -25,6 +25,7 @@ public:
 	virtual ~Bone();
 	Vec3f& getPoseDirRef();
 	float getLength();
+	float* getLengthRef();
 	Matrix44<float>& getTransformRef();
 	Bone* getParent();
 	void reset();

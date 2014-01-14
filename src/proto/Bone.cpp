@@ -80,4 +80,9 @@ void Bone::setLength( float p_len )
 	mLength=p_len;
 }
 
+float* Bone::getLengthRef()
+{
+	return &mLength;
+}
+
 

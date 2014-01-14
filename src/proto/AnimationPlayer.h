@@ -25,7 +25,7 @@ public:
 	AnimationPlayer();
 	virtual ~AnimationPlayer();
 
-	void init();
+	void init(int p_feetCount=4);
 	void update(float p_dt);
 	GaitCycle* getGaitDataRef() const;
 	float* getGaitPhaseRef();

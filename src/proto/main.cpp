@@ -38,6 +38,11 @@ class CinderApp : public AppBasic {
 	void visualizeGaitCycles(float& p_baseLine);
 	void drawSwingEaseGraph(float p_xoffset, float y_offset, float p_width, float p_height);
 	void drawBones(int p_idx, Vec3f p_offset);
+	void clearRig();
+	void resetRig();
+	void createLegWindow();
+	void addLegParams(int p_rowIdx);
+	void removeLegWindow();
 
 	// windows timer
 	__int64 countsPerSec;
@@ -58,6 +63,7 @@ class CinderApp : public AppBasic {
 	Quatf			mCamRot;
 	float			mCamDist;
 	float			mTextBaseLine;
+	int				mInterfaceFeetSetting;
 
 	gl::TextureFontRef*	mFont;
 	static const int	mMaxFontSize=20;
@@ -71,6 +77,7 @@ class CinderApp : public AppBasic {
 
 	// Input
 	params::InterfaceGlRef mDebugInterface;
+	params::InterfaceGlRef mLegRowInterface;
 };
 
 void CinderApp::mouseDrag( MouseEvent event )
@@ -113,21 +120,16 @@ void CinderApp::setup()
 {
 	// main
 	mTextBaseLine=20.0f;
-	mPlayer.init();
 	mFont = new gl::TextureFontRef[mMaxFontSize+1];
 	for (int i=0;i<=mMaxFontSize;i++)
 		mFont[i] = gl::TextureFont::create( Font( "Arial", (float)i+8.0f ));
 
 	// legs and feet
+	mLeg=NULL;
+	mFoot=NULL;
+	mInterfaceFeetSetting=4;
 	mDistToGround=2.0f;
-	int numfeet=mPlayer.getGaitDataRef()->mFeetCount;
-	mFoot = new Foot*[numfeet];
-	mLeg = new IKRig2Joint*[numfeet];
-	for (int i=0;i<numfeet;i++)
-	{
-		mFoot[i]=new Foot();
-		mLeg[i]=new IKRig2Joint(nullptr,mFoot[i],mDistToGround+0.3f);
-	}
+	resetRig();
 
 
 	// camera
@@ -141,7 +143,7 @@ void CinderApp::setup()
 	myImage = gl::Texture( loadImage( loadAsset( "img.jpg" ) ) );
 
 	// Debug interface
-	mDebugInterface = params::InterfaceGl::create( "Gait", Vec2i( 225, 300 ) );
+	mDebugInterface = params::InterfaceGl::create( "Gait", Vec2i( 225, 500 ) );
 	mDebugInterface->setOptions("","position='10 300'");
 	mDebugInterface->addParam( "Cam angle", &mCamRot, "opened=true");
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
@@ -155,18 +157,13 @@ void CinderApp::setup()
 	mDebugInterface->addParam( "Swing height", mPlayer.getSwingHeightRef(), "min=0.02 max=5.0 step=0.01" );
 	mDebugInterface->addParam( "Stride length", mPlayer.getStrideLengthRef(), "min=0.02 max=5.0 step=0.01" );
 	mDebugInterface->addParam( "Ground dist", &mDistToGround, "min=0.02 max=5.0 step=0.01" );
+	mDebugInterface->addParam( "Feet count", &mInterfaceFeetSetting, "min=2 max=12 step=2" );
 }
 
 
 void CinderApp::shutdown()
 {	
-	for (int i=0;i<mPlayer.getGaitDataRef()->mFeetCount;i++)
-	{
-		delete mFoot[i];
-		delete mLeg[i];
-	}
-	delete [] mFoot;
-	delete [] mLeg;
+	clearRig();
 	delete [] mFont;
 }
 
@@ -180,6 +177,9 @@ void CinderApp::update()
 	dt = min(max(dt,0.0),0.7);
 	fps = 1.0/dt;
 	timeAccumulator+=(float)dt;
+
+	if (mInterfaceFeetSetting!=mPlayer.getGaitDataRef()->mFeetCount)
+		resetRig();
 
 	mPlayer.update((float)dt);
 
@@ -199,6 +199,15 @@ void CinderApp::update()
 		mFoot[i]->setPosition(Vec3f(0.0f,
 							 mPlayer.getSwingHeight()*mPlayer.autoEase(sc->getSwingPhase(p_gt))-mDistToGround,
 							 mPlayer.getStrideLength()*cos(2.0f*M_PI*(nstepoffset))));
+		// quick solution for letting user update
+		// row-wise data
+		if (i%2!=0)
+		{
+			mLeg[i]->getLowerBone()->setLength(mLeg[i-1]->getLowerBone()->getLength());
+			mLeg[i]->getUpperBone()->setLength(mLeg[i-1]->getUpperBone()->getLength());
+			mLeg[i]->setJointType(*mLeg[i-1]->getJointTypeRef());
+		}
+		//
 		mLeg[i]->updateRig();
 	}
 }
@@ -237,6 +246,7 @@ void CinderApp::draw()
 	drawGaitPhaseText(baseLine);
 	visualizeGaitCycles(baseLine);
 	mDebugInterface->draw();
+	mLegRowInterface->draw();
 }
 
 void CinderApp::visualizeGaitCycles(float& p_baseLine)
@@ -311,12 +321,12 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 
 		// draw duty factor
 		mFont[fsize]->drawString(string("DF: ")+toString(cycleL->mNormDutyFactor),
-			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,1.0f),y1+5+fsize));
+			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,0.7f),y1+5+fsize));
 
 		// draw swing phase
 		glColor4f( ColorA( 0.8f, 1.0f, 0.1f, 1.0f ) );
 		mFont[fsize]->drawString(string("swing: ")+toString(cycleL->getSwingPhase(currentT),4),
-			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,1.0f),y1+15+fsize));
+			Vec2f(lineStart+timelineLen*min(offsetL+lenL*0.5f,0.55f),y1+15+fsize));
 
 		// draw step trigger
 		glColor4f( ColorA( 0.5f, 1.0f, 1.0f, 1.0f ) );
@@ -344,12 +354,12 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 
 		// draw duty factor
 		mFont[fsize]->drawString(string("DF: ")+toString(cycleR->mNormDutyFactor),
-			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,1.0f),y1+5+fsize));
+			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,0.7f),y1+5+fsize));
 
 		// draw swing phase
 		glColor4f( ColorA( 0.8f, 1.0f, 0.1f, 1.0f ) );
 		mFont[fsize]->drawString(string("swing: ")+toString(cycleR->getSwingPhase(currentT),4),
-			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,1.0f),y1+15+fsize));
+			Vec2f(lineStart+timelineLen*min(offsetR+lenR*0.5f,0.55f),y1+15+fsize));
 
 		// draw step trigger
 		glColor4f( ColorA( 0.5f, 1.0f, 1.0f, 1.0f ) );
@@ -469,6 +479,81 @@ void CinderApp::drawSwingEaseGraph( float p_xoffset, float y_offset, float p_wid
 	gl::end();
 	gl::color( 0.7f, 0.5f, 0.25f ); 
 	gl::drawLine(Vec2f(p_xoffset,y_offset+p_height),Vec2f(p_xoffset+p_width,y_offset+p_height));
+}
+
+void CinderApp::clearRig()
+{
+	if (mFoot!=NULL && mLeg!=NULL)
+	{
+		int feet = mPlayer.getGaitDataRef()->mFeetCount;
+		int row=0;
+		for (int i=0;i<feet;i++)
+		{			
+			delete mFoot[i];
+			delete mLeg[i];
+			if (i%2!=0) row++;
+		}
+		delete [] mFoot;
+		delete [] mLeg;
+		mFoot=NULL;
+		mLeg=NULL;
+		removeLegWindow();
+	}
+}
+
+void CinderApp::resetRig()
+{
+	clearRig();
+	mPlayer.init(mInterfaceFeetSetting);
+	int numfeet=mPlayer.getGaitDataRef()->mFeetCount;
+	mFoot = new Foot*[numfeet];
+	mLeg = new IKRig2Joint*[numfeet];
+	int row=0;
+	createLegWindow();
+	for (int i=0;i<numfeet;i++)
+	{
+		mFoot[i]=new Foot();
+		IKRig2Joint::JOINT_TYPE jointType=IKRig2Joint::NORMAL;
+		if (numfeet>2 && row%2==0) jointType=IKRig2Joint::BIRD_FAKE_APPROX;
+		mLeg[i]=new IKRig2Joint(nullptr,mFoot[i],mDistToGround+0.3f,jointType);
+		if (i%2!=0)
+		{
+			row++;
+		}
+		else
+		{
+			addLegParams( i );
+		}
+	}
+}
+
+void CinderApp::addLegParams( int p_rowIdx )
+{
+	int row=p_rowIdx/2 + 1;
+	string strrow=toString(row);
+	string name=string("Row ")+strrow;
+	mLegRowInterface->addText(name);
+	name=string("Len upper")+strrow;
+	mLegRowInterface->addParam(name,mLeg[p_rowIdx]->getUpperBone()->getLengthRef(), "min=0.1 max=5.0 step=0.01");
+	name=string("Len lower")+strrow;
+	mLegRowInterface->addParam(name,mLeg[p_rowIdx]->getLowerBone()->getLengthRef(), "min=0.1 max=5.0 step=0.01");
+	name=string("Joint type")+strrow;
+	vector<string> jointTypes;
+	jointTypes.push_back("NORMAL");
+	jointTypes.push_back("BIRD_FAKE_APPROX");
+	mLegRowInterface->addParam(name,jointTypes,(int*)mLeg[p_rowIdx]->getJointTypeRef());
+}
+
+void CinderApp::removeLegWindow()
+{
+	mLegRowInterface->clear();
+}
+
+void CinderApp::createLegWindow()
+{
+	mLegRowInterface=params::InterfaceGl::create( "Limbs", Vec2i( 225, 300 ) );
+	string op=string("position='")+toString(-225-10+getWindowWidth())+string(" 300'");
+	mLegRowInterface->setOptions("",op.c_str());
 }
 
 
