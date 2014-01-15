@@ -64,6 +64,9 @@ class CinderApp : public AppBasic {
 	float			mCamDist;
 	float			mTextBaseLine;
 	int				mInterfaceFeetSetting;
+	bool			mDrawImpactTrack;
+	float*			mRowMaxSpeed;
+	float*			mMovingOffset;
 
 	gl::TextureFontRef*	mFont;
 	static const int	mMaxFontSize=20;
@@ -111,6 +114,7 @@ void CinderApp::prepareSettings( Settings *settings )
 	fps=0.0;
 	timeAccumulator=0.0f;
 	secsPerCount = (double)(1.0f / (float)countsPerSec);
+	mDrawImpactTrack=false;
 
 	settings->setWindowSize( 1280, 768 );
 	settings->setFrameRate( 60.0f );
@@ -127,8 +131,10 @@ void CinderApp::setup()
 	// legs and feet
 	mLeg=NULL;
 	mFoot=NULL;
+	mRowMaxSpeed=NULL;
 	mInterfaceFeetSetting=4;
 	mDistToGround=2.0f;
+	mMovingOffset=NULL;
 	resetRig();
 
 
@@ -137,7 +143,8 @@ void CinderApp::setup()
 	mCamPos = Vec3f( 0.0f, 0.0f, mCamDist );
 	mCamLookat = Vec3f::zero();
 	mCamUp = Vec3f::yAxis();
-	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 0.01f, 1000.0f );
+	mCam.setPerspective( 60.0f, getWindowAspectRatio(), 0.001f, 1000.0f );
+	mCamRot=Quatf(-0.85f,-0.11f,-0.51f,-0.05f);
 
 	// funny
 	myImage = gl::Texture( loadImage( loadAsset( "img.jpg" ) ) );
@@ -149,11 +156,12 @@ void CinderApp::setup()
 	mDebugInterface->addParam( "Debug baseline", &mTextBaseLine);
 	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=0.02 max=1000.0 step=1.0 keyIncr=s keyDecr=w" );
 	mDebugInterface->addParam( "Phase", mPlayer.getGaitPhaseRef() );
+	mDebugInterface->addParam( "Draw impact track", &mDrawImpactTrack );
 	vector<string> easingNames;
 	easingNames.push_back("COSINE_INV_NORM");
 	easingNames.push_back("HALF_SINE");
 	mDebugInterface->addParam( "Easing", easingNames,(int*)mPlayer.getEasingStateRef() );
-	mDebugInterface->addParam( "Cycle time", &mPlayer.getGaitDataRef()->mGaitPeriod, "min=0.02 max=30.0 step=0.01" );
+	mDebugInterface->addParam( "Cycle time", &mPlayer.getGaitDataRef()->mGaitPeriod, "min=0.3 max=30.0 step=0.01" );
 	mDebugInterface->addParam( "Swing height", mPlayer.getSwingHeightRef(), "min=0.02 max=5.0 step=0.01" );
 	mDebugInterface->addParam( "Stride length", mPlayer.getStrideLengthRef(), "min=0.02 max=5.0 step=0.01" );
 	mDebugInterface->addParam( "Ground dist", &mDistToGround, "min=0.02 max=5.0 step=0.01" );
@@ -170,6 +178,8 @@ void CinderApp::shutdown()
 
 void CinderApp::update()
 {
+	if (mPlayer.getGaitDataRef()->mGaitPeriod<0.3f)
+		mPlayer.getGaitDataRef()->mGaitPeriod=0.3f;
 	// Get Delta time	
 	prevTimeStamp = currTimeStamp;
 	QueryPerformanceCounter((LARGE_INTEGER*)&currTimeStamp);
@@ -179,7 +189,12 @@ void CinderApp::update()
 	timeAccumulator+=(float)dt;
 
 	if (mInterfaceFeetSetting!=mPlayer.getGaitDataRef()->mFeetCount)
+	{
+		if (mInterfaceFeetSetting%2!=0) {mInterfaceFeetSetting--;}
+		if (mInterfaceFeetSetting>12) mInterfaceFeetSetting=12;
+		if (mInterfaceFeetSetting<2) mInterfaceFeetSetting=2;
 		resetRig();
+	}
 
 	mPlayer.update((float)dt);
 
@@ -191,24 +206,72 @@ void CinderApp::update()
 	// update feet	
 	GaitCycle* gaitCycle=mPlayer.getGaitDataRef();
 	float p_gt=*mPlayer.getGaitPhaseRef();
+	int feetOnGroundCount=0;
 	for (int i=0;i < gaitCycle->mFeetCount;i++)
 	{
+		int rowId=i/2;
+		bool lastInRow=false;
 		StepCycle* sc=&gaitCycle->mStepCycles[i];
+		Foot* foot=mFoot[i];
+		IKRig2Joint* leg=mLeg[i];
 		float nstepoffset=p_gt-sc->mNormStepTrigger;
 		if (nstepoffset<0.0f) nstepoffset+=1.0f;
-		mFoot[i]->setPosition(Vec3f(0.0f,
+		foot->setPosition(Vec3f(0.0f,
 							 mPlayer.getSwingHeight()*mPlayer.autoEase(sc->getSwingPhase(p_gt))-mDistToGround,
-							 mPlayer.getStrideLength()*cos(2.0f*M_PI*(nstepoffset))));
+							 mPlayer.getStrideLength()*cos(2.0f*(float)M_PI*(nstepoffset))));
 		// quick solution for letting user update
 		// row-wise data
 		if (i%2!=0)
 		{
-			mLeg[i]->getLowerBone()->setLength(mLeg[i-1]->getLowerBone()->getLength());
-			mLeg[i]->getUpperBone()->setLength(mLeg[i-1]->getUpperBone()->getLength());
-			mLeg[i]->setJointType(*mLeg[i-1]->getJointTypeRef());
+			leg->getLowerBone()->setLength(mLeg[i-1]->getLowerBone()->getLength());
+			leg->getUpperBone()->setLength(mLeg[i-1]->getUpperBone()->getLength());
+			leg->setJointType(*mLeg[i-1]->getJointTypeRef());
+			lastInRow=true;
+		}
+		else
+		{
+			mRowMaxSpeed[rowId]=0.0f;
+			feetOnGroundCount=0;
 		}
 		//
-		mLeg[i]->updateRig();
+		leg->updateRig();
+		// tell if in stance or not
+		Foot::PHASE_STATUS footStatus=Foot::SWING;
+		if (foot->getPosition().y<-mDistToGround+0.01f)
+			footStatus=Foot::STANCE;
+		foot->updateSpeed(footStatus,(float)dt);
+		if (foot->isInStance())
+		{
+			feetOnGroundCount++;
+			if (mRowMaxSpeed[rowId]<foot->getSpeed())
+				mRowMaxSpeed[rowId]=foot->getSpeed();
+		}
+		if (lastInRow)
+		{
+			// update moving offset
+			mMovingOffset[rowId] += mRowMaxSpeed[rowId]*dt;
+		}
+	}
+	//mAvgSpeed/=(float)feetOnGroundCount;
+// 	for (int i=0;i < gaitCycle->mFeetCount;i++) // prevent gliding
+// 	{
+// 		Foot* foot=mFoot[i];
+// 		if (foot->getSpeed()<mMaxSpeed && foot->isInStance())
+// 		{
+// 			Vec3f pos = foot->getPosition();
+// 			IKRig2Joint* leg=mLeg[i];
+// 			pos.z -= (foot->getSpeed()+mMaxSpeed)*dt;
+// 			foot->setPosition(pos);
+// 			leg->updateRig();
+// 		}
+// 	}
+
+	if (mMovingOffset[0]>10.0f)
+	{
+		for (int i=0;i < gaitCycle->mFeetCount/2;i++)
+		{
+			mMovingOffset[i]=-10.0f;
+		}
 	}
 }
 
@@ -235,7 +298,7 @@ void CinderApp::draw()
 	visualizeSkeleton();
 
 	glColor4f( ColorA( 0.1f, 0.7f, 0.1f, 1.0f ) );
-	gl::drawCube(Vec3f(0.0f,-mDistToGround,0.0f),Vec3f(4.0f,0.01f,5.0f));
+	gl::drawCube(Vec3f(0.0f,-mDistToGround,0.0f),Vec3f(6.0f,0.01f,15.0f));
 
 	glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
 	gl::disableDepthRead();
@@ -245,6 +308,12 @@ void CinderApp::draw()
 	drawFPS(baseLine);
 	drawGaitPhaseText(baseLine);
 	visualizeGaitCycles(baseLine);
+
+	// Draw speed
+	glColor4f( ColorA( 0.1f, 1.0f, 1.0f, 1.0f ) );
+	mFont[15]->drawString(string("Avg speed ")+toString(mRowMaxSpeed[0],5),
+		Vec2f(20.0f,baseLine+15.0f));
+
 	mDebugInterface->draw();
 	mLegRowInterface->draw();
 }
@@ -382,24 +451,25 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 void CinderApp::drawGaitPhaseText( float& p_baseLine )
 {
 	int fsize=15;
-	mFont[fsize]->drawString(toString(*mPlayer.getGaitPhaseRef()),
-		Vec2f(2.0f,p_baseLine));
-	p_baseLine+=(float)fsize;
+	mFont[fsize]->drawString(string("Gait phase ")+toString(*mPlayer.getGaitPhaseRef(),5),
+		Vec2f(20.0f,p_baseLine));
+	p_baseLine+=(float)fsize+5.0f;
 }
 
 void CinderApp::drawFPS( float& p_baseLine )
 {
 	int fsize=10;
-	mFont[fsize]->drawString(toString((int)fps),
-		Vec2f(2.0f,p_baseLine));
-	p_baseLine+=(float)fsize;
+	mFont[fsize]->drawString(string("FPS ")+toString((int)fps,5),
+		Vec2f(20.0f,p_baseLine));
+	p_baseLine+=(float)fsize+5.0f;
 }
 
 void CinderApp::drawBones( int p_idx, Vec3f p_offset )
 {
-
 	// IK
-	IKRig2Joint* leg=mLeg[p_idx];
+	IKRig2Joint* leg=mLeg[p_idx];	
+	Foot* foot=mFoot[p_idx];
+
 	glColor4f( ColorA( 1.0f, 0.0f, 0.0f, 1.0f ) );
 	Vec3f start=leg->getUpperBone()->getOrigin();
 	Vec3f end = leg->getUpperBone()->getEnd();
@@ -410,7 +480,19 @@ void CinderApp::drawBones( int p_idx, Vec3f p_offset )
 	end = leg->getLowerBone()->getEnd();
 	gl::drawVector(p_offset+start,p_offset+end);
 
-	gl::drawColorCube(p_offset+mFoot[p_idx]->getPosition(),Vec3f(0.1f,0.1f,0.2f));
+
+	Vec3f footPos=p_offset+foot->getPosition();
+	Vec3f footSz=Vec3f(0.1f,0.1f,0.2f);
+	if (!foot->isInStance())
+		gl::drawColorCube(footPos,footSz);
+	else
+	{
+		gl::color( 1.0f, 0.5f, 0.0f );  
+		gl::drawCube(footPos,footSz);
+		gl::color( 0.0f, 0.0f, 0.0f );  
+		if (mDrawImpactTrack)
+			gl::drawLine(p_offset+foot->getStanceStart(),p_offset+foot->getStanceEnd());
+	}
 }
 
 void CinderApp::visualizeSkeleton()
@@ -424,19 +506,26 @@ void CinderApp::visualizeSkeleton()
 	float heightFromGround=bodyH*0.5f;
 	float jointSz=0.3f;
 	float bodyL=(float)(cycles->mFeetCount-1)*legMargin+legMargin;
-
-	gl::drawColorCube(Vec3f(0.0f,heightFromGround,0.0f),Vec3f(bodyW,bodyH,bodyL));
-	gl::drawColorCube(Vec3f(0.0f,heightFromGround,bodyL*0.5f),Vec3f(0.3f,0.3f,0.3f));
+	float moveOffsetAvg=0.0f;
+	int rows = cycles->mFeetCount/2;
+	for (int i=0;i<rows;i++)
+		moveOffsetAvg+=mMovingOffset[i];
+	moveOffsetAvg/=rows;
+	
+	Vec3f moveOffset = Vec3f(0.0f,0.0f,moveOffsetAvg);
+	gl::drawColorCube(moveOffset+Vec3f(0.0f,heightFromGround,0.0f),Vec3f(bodyW,bodyH,bodyL)); // body
+	gl::drawColorCube(moveOffset+Vec3f(0.0f,heightFromGround,bodyL*0.5f),Vec3f(0.3f,0.3f,0.3f)); // head
 
 	// Draw leg+feet visualization
 	for (int i=0;i<cycles->mFeetCount;i+=2)
 	{
 		StepCycle* cycleL = &cycles->mStepCycles[i];
 		StepCycle* cycleR = &cycles->mStepCycles[i+1];
+		moveOffset = Vec3f(0.0f,0.0f,mMovingOffset[i/2]);
 
 		// LEFT
 		// left leg joint
-		Vec3f offset=Vec3f(bodyW*0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i);
+		Vec3f offset=moveOffset+Vec3f(bodyW*0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i);
 		gl::drawColorCube(offset,
 			Vec3f(jointSz,jointSz,jointSz));
 		if (cycleL->isInStance(currentT))
@@ -450,7 +539,7 @@ void CinderApp::visualizeSkeleton()
 
 		// RIGHT
 		// right leg joing
-		offset=Vec3f(bodyW*-0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i);
+		offset=moveOffset+Vec3f(bodyW*-0.5f,heightFromGround-bodyH*0.5f,bodyL*0.5f-legMargin-legMargin*(float)i);
 		gl::drawColorCube(offset,
 			Vec3f(jointSz,jointSz,jointSz));
 		if (cycleR->isInStance(currentT))
@@ -483,7 +572,7 @@ void CinderApp::drawSwingEaseGraph( float p_xoffset, float y_offset, float p_wid
 
 void CinderApp::clearRig()
 {
-	if (mFoot!=NULL && mLeg!=NULL)
+	if (mFoot!=NULL && mLeg!=NULL && mRowMaxSpeed!=NULL)
 	{
 		int feet = mPlayer.getGaitDataRef()->mFeetCount;
 		int row=0;
@@ -495,8 +584,12 @@ void CinderApp::clearRig()
 		}
 		delete [] mFoot;
 		delete [] mLeg;
+		delete [] mRowMaxSpeed;
+		delete [] mMovingOffset;
 		mFoot=NULL;
 		mLeg=NULL;
+		mRowMaxSpeed=NULL;
+		mMovingOffset=NULL;
 		removeLegWindow();
 	}
 }
@@ -508,10 +601,14 @@ void CinderApp::resetRig()
 	int numfeet=mPlayer.getGaitDataRef()->mFeetCount;
 	mFoot = new Foot*[numfeet];
 	mLeg = new IKRig2Joint*[numfeet];
+	mRowMaxSpeed = new float[numfeet/2];
+	mMovingOffset=new float[numfeet/2];
 	int row=0;
 	createLegWindow();
 	for (int i=0;i<numfeet;i++)
 	{
+		mMovingOffset[i/2]=0.0f;
+		mRowMaxSpeed[i/2]=0.0f;
 		mFoot[i]=new Foot();
 		IKRig2Joint::JOINT_TYPE jointType=IKRig2Joint::NORMAL;
 		if (numfeet>2 && row%2==0) jointType=IKRig2Joint::BIRD_FAKE_APPROX;
