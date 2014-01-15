@@ -19,8 +19,8 @@ class IKRig2Joint
 public:
 	enum JOINT_TYPE
 	{
-		NORMAL,
-		BIRD_FAKE_APPROX
+		PLANTIGRADE,
+		DIGITIGRADE_FRONT_APPROX
 	};
 	IKRig2Joint(Bone* p_parent, Foot* p_foot, float p_len, JOINT_TYPE p_joint);
 	virtual ~IKRig2Joint();

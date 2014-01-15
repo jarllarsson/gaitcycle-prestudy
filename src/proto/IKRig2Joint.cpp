@@ -27,7 +27,7 @@ Bone* IKRig2Joint::getLowerBone()
 void IKRig2Joint::updateRig()
 {
 	int kneeFlip=1;
-	if (mJointType==JOINT_TYPE::BIRD_FAKE_APPROX)
+	if (mJointType==JOINT_TYPE::DIGITIGRADE_FRONT_APPROX)
 		kneeFlip=-1;
 	Vec3f footPos=mFoot->getPosition();
 	Vec3f topToFoot = footPos-mUpperBone->getOrigin();

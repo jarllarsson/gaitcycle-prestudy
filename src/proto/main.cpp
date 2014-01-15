@@ -251,7 +251,7 @@ void CinderApp::update()
 		if (lastInRow)
 		{
 			// update moving offset
-			mMovingOffset[rowId] += mRowMaxSpeed[rowId]*dt;
+			mMovingOffset[rowId] += mRowMaxSpeed[rowId]*(float)dt;
 		}
 	}
 	//mAvgSpeed/=(float)feetOnGroundCount;
@@ -624,8 +624,8 @@ void CinderApp::resetRig()
 		mMovingOffset[i/2]=0.0f;
 		mRowMaxSpeed[i/2]=0.0f;
 		mFoot[i]=new Foot();
-		IKRig2Joint::JOINT_TYPE jointType=IKRig2Joint::NORMAL;
-		if (numfeet>2 && row%2==0) jointType=IKRig2Joint::BIRD_FAKE_APPROX;
+		IKRig2Joint::JOINT_TYPE jointType=IKRig2Joint::PLANTIGRADE;
+		if (numfeet>2 && row%2==0) jointType=IKRig2Joint::DIGITIGRADE_FRONT_APPROX;
 		mLeg[i]=new IKRig2Joint(nullptr,mFoot[i],mDistToGround+0.3f,jointType);
 		if (i%2!=0)
 		{
@@ -650,8 +650,8 @@ void CinderApp::addLegParams( int p_rowIdx )
 	mLegRowInterface->addParam(name,mLeg[p_rowIdx]->getLowerBone()->getLengthRef(), "min=0.1 max=5.0 step=0.01");
 	name=string("Joint type")+strrow;
 	vector<string> jointTypes;
-	jointTypes.push_back("NORMAL");
-	jointTypes.push_back("BIRD_FAKE_APPROX");
+	jointTypes.push_back("PLANTIGRADE");
+	jointTypes.push_back("DIGITIGRADE_FRONT_APPROX");
 	mLegRowInterface->addParam(name,jointTypes,(int*)mLeg[p_rowIdx]->getJointTypeRef());
 }
 
