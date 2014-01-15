@@ -45,6 +45,8 @@ void AnimationPlayer::init( int p_feetCount/*=4*/ )
 				c=0.0f;
 			}
 			c+=0.5f;
+			if ((i+1)%4==0)
+				c=0.25f;
 		}
 
 	}
