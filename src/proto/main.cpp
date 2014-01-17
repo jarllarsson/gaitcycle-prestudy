@@ -68,6 +68,7 @@ class CinderApp : public AppBasic {
 	bool			mMove;
 	float*			mRowMaxSpeed;
 	float*			mMovingOffset;
+	bool			mMoveUsingAverage;
 
 	gl::TextureFontRef*	mFont;
 	static const int	mMaxFontSize=20;
@@ -118,7 +119,7 @@ void CinderApp::prepareSettings( Settings *settings )
 	mDrawImpactTrack=false;
 	mMove=true;
 
-	settings->setWindowSize( 1280, 768 );
+	settings->setWindowSize( 1280, 720 );
 	settings->setFrameRate( 60.0f );
 }
 
@@ -137,6 +138,7 @@ void CinderApp::setup()
 	mInterfaceFeetSetting=4;
 	mDistToGround=2.0f;
 	mMovingOffset=NULL;
+	mMoveUsingAverage=false;
 	resetRig();
 
 
@@ -159,6 +161,7 @@ void CinderApp::setup()
 	mDebugInterface->addParam( "Cam dist", &mCamDist, "min=0.02 max=1000.0 step=1.0 keyIncr=s keyDecr=w" );
 	mDebugInterface->addParam( "Draw impact track", &mDrawImpactTrack );
 	mDebugInterface->addParam( "Move", &mMove );
+	mDebugInterface->addParam( "Move using avg spd (can cause sliding)", &mMoveUsingAverage);
 	vector<string> easingNames;
 	easingNames.push_back("COSINE_INV_NORM");
 	easingNames.push_back("HALF_SINE");
@@ -245,11 +248,23 @@ void CinderApp::update()
 		if (foot->isInStance())
 		{
 			feetOnGroundCount++;
-			if (mRowMaxSpeed[rowId]<foot->getSpeed())
-				mRowMaxSpeed[rowId]=foot->getSpeed();
+			if (mMoveUsingAverage) // move using average speed
+			{
+				mRowMaxSpeed[rowId]+=foot->getSpeed();
+			}
+			else // move using max speed
+			{
+				if (mRowMaxSpeed[rowId]<foot->getSpeed())
+					mRowMaxSpeed[rowId]=foot->getSpeed();
+			}
+
 		}
 		if (lastInRow)
 		{
+			if (mMoveUsingAverage && feetOnGroundCount>0) // move using average speed
+			{
+				mRowMaxSpeed[rowId]/=feetOnGroundCount;
+			}
 			// update moving offset
 			mMovingOffset[rowId] += mRowMaxSpeed[rowId]*(float)dt;
 		}
@@ -302,7 +317,7 @@ void CinderApp::draw()
 	glColor4f( ColorA( 0.1f, 0.7f, 0.1f, 1.0f ) );
 	gl::drawCube(Vec3f(0.0f,-mDistToGround,0.0f),Vec3f(6.0f,0.01f,15.0f));
 
-	glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
+	glColor4f( ColorA( 0.0f, 0.0f, 0.0f, 1.0f ) );
 	gl::disableDepthRead();
 	gl::disableDepthWrite();
 	float baseLine = mTextBaseLine;
@@ -312,7 +327,7 @@ void CinderApp::draw()
 	visualizeGaitCycles(baseLine);
 
 	// Draw speed
-	glColor4f( ColorA( 0.1f, 1.0f, 1.0f, 1.0f ) );
+	glColor4f( ColorA( 0.0f, 0.0f, 0.0f, 1.0f ) );
 	mFont[15]->drawString(string("Front speed  u/s ")+toString(mRowMaxSpeed[0],5),
 		Vec2f(20.0f,baseLine+15.0f));
 	baseLine+=20.0f;
@@ -352,7 +367,7 @@ void CinderApp::visualizeGaitCycles(float& p_baseLine)
 	// Draw feet visualization
 	for (int i=0;i<cycles->mFeetCount;i+=2)
 	{
-		glColor4f( ColorA( 1.0f, 0.0f, 0.5f, 1.0f ) );
+		glColor4f( ColorA( 0.0f, 0.0f, 0.0f, 1.0f ) );
 		float y1=p_baseLine+(feetMargin+feetH)*i;
 		float y2=y1+feetH;
 		StepCycle* cycleL = &cycles->mStepCycles[i];
@@ -653,6 +668,15 @@ void CinderApp::addLegParams( int p_rowIdx )
 	jointTypes.push_back("PLANTIGRADE");
 	jointTypes.push_back("DIGITIGRADE_FRONT_APPROX");
 	mLegRowInterface->addParam(name,jointTypes,(int*)mLeg[p_rowIdx]->getJointTypeRef());
+	name=string("DF Left")+strrow;
+	mLegRowInterface->addParam(name,&mPlayer.getGaitDataRef()->mStepCycles[p_rowIdx].mNormDutyFactor, "min=0.1 max=0.99 step=0.01");
+	name=string("ST Left")+strrow;
+	mLegRowInterface->addParam(name,&mPlayer.getGaitDataRef()->mStepCycles[p_rowIdx].mNormStepTrigger, "min=0.1 max=0.99 step=0.01");
+	name=string("DF Right")+strrow;
+	mLegRowInterface->addParam(name,&mPlayer.getGaitDataRef()->mStepCycles[p_rowIdx+1].mNormDutyFactor, "min=0.1 max=0.99 step=0.01");	
+	name=string("ST Right")+strrow;
+	mLegRowInterface->addParam(name,&mPlayer.getGaitDataRef()->mStepCycles[p_rowIdx+1].mNormStepTrigger, "min=0.1 max=0.99 step=0.01");
+	name=string("Joint type")+strrow;
 }
 
 void CinderApp::removeLegWindow()
